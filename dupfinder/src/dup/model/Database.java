@@ -431,7 +431,7 @@ public class Database {
 		return this.registeredDupDiffInfo;
 	}
 
-	public RegisteredDupDiffInfo getRegisteredDupDiffInfo(FileInfo file) {
+	private RegisteredDupDiffInfo getRegisteredDupDiffInfo(FileInfo file) {
 		File jfile = file.getJavaFile();
 		RegisteredDupDiffInfo info = getRegisteredDupDiffInfo(jfile);
 

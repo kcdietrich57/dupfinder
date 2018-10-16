@@ -56,14 +56,15 @@ public class BatchDetailsUpdate {
 			return;
 		}
 
-		Trace.traceln(Trace.VERBOSE, "BatchDetailsUpdate: Processing batch of " + size() + " files.");
+		Trace.traceln(Trace.VERBOSE, //
+				"BatchDetailsUpdate: Processing " + size() + " files.");
 
 		for (UpdateFileInfo ufile : this.updates) {
 			if (!ufile.origfile.getDetailLevel().isLessThan(this.targetDetailLevel)) {
 				continue;
 			}
 
-			Checksum.Checksums checksums = Checksum.getChecksums( //
+			Checksum.ChecksumValues checksums = Checksum.getChecksums( //
 					ufile.origfile, this.context, this.targetDetailLevel);
 			ufile.origfile.setChecksums(checksums);
 		}
@@ -71,7 +72,8 @@ public class BatchDetailsUpdate {
 		this.filecount += this.updates.size();
 		this.updates.clear();
 
-		Trace.traceln(Trace.VERBOSE, "BatchDetailsUpdate: Processed total of " + this.filecount + " files.");
+		Trace.traceln(Trace.VERBOSE, //
+				"BatchDetailsUpdate: Processed of " + this.filecount + " files.");
 
 		Database.instance().getModel().structureChanged();
 	}

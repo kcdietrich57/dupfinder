@@ -6,6 +6,7 @@ import java.util.List;
 
 import dup.analyze.Checksum;
 
+/** Class representing a file object */
 public class FileInfo extends FileObjectInfo {
 	private long filesize;
 	private long timestamp;
@@ -143,7 +144,7 @@ public class FileInfo extends FileObjectInfo {
 		return getDupinfo().getSampleChecksum(calc);
 	}
 
-	public void setChecksums(Checksum.Checksums checksums) {
+	public void setChecksums(Checksum.ChecksumValues checksums) {
 		if (checksums.prefix != Checksum.CKSUM_UNDEFINED) {
 			setPrefixChecksum(checksums.prefix);
 		}

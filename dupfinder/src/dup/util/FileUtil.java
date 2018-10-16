@@ -183,7 +183,7 @@ public class FileUtil {
 			FileInfo finfo = fileiter.next();
 
 			if (finfo.getDetailLevel().isLessThan(detail)) {
-				Checksum.Checksums checksums = Checksum.getChecksums(finfo, context, detail);
+				Checksum.ChecksumValues checksums = Checksum.getChecksums(finfo, context, detail);
 				finfo.setChecksums(checksums);
 
 				++filecount;

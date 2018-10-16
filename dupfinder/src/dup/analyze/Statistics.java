@@ -4,6 +4,7 @@ import javax.tools.FileObject;
 
 import dup.model.FolderInfo;
 
+/** Statistics (TODO unused) */
 public class Statistics {
 	public long wastedBytes = 0;
 	public double wastePercentage = 0.0;

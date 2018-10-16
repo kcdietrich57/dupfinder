@@ -4,10 +4,12 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
+/** Generic info about folder/file */
 public abstract class FileObjectInfo {
 	private FolderInfo folder;
 	private String name;
 
+	/** For files, the file size; for folders, the tree size */
 	public abstract long getSize();
 
 	public FileObjectInfo(FolderInfo folder, File file) {
@@ -19,17 +21,18 @@ public abstract class FileObjectInfo {
 		this.name = name;
 	}
 
+	/** Build list of ancestor objects - Starting with Database */
 	public Object[] getPathFromRoot() {
 		List<Object> pathObjects = new ArrayList<Object>();
 
-		getPathFromRoot(pathObjects);
+		buildPathFromRoot(pathObjects);
 
 		return pathObjects.toArray();
 	}
 
-	protected void getPathFromRoot(List<Object> pathObjects) {
+	protected final void buildPathFromRoot(List<Object> pathObjects) {
 		if (this.folder != null) {
-			this.folder.getPathFromRoot(pathObjects);
+			this.folder.buildPathFromRoot(pathObjects);
 		} else {
 			pathObjects.add(Database.instance());
 			pathObjects.add(getContext());
@@ -42,6 +45,10 @@ public abstract class FileObjectInfo {
 		return this.folder;
 	}
 
+	/**
+	 * Return the top folder in the filesystem model containing this object. i.e.
+	 * the Context folder.
+	 */
 	public FolderInfo getRootFolder() {
 		if (this.folder != null) {
 			return this.folder.getRootFolder();
@@ -51,10 +58,16 @@ public abstract class FileObjectInfo {
 		return (FolderInfo) this;
 	}
 
+	/** Get the Context object representing the top folder for this object */
 	public Context getContext() {
 		return Database.instance().getContextForRoot(getRootFolder());
 	}
 
+	/**
+	 * Return the Database's Context containing this filesystem object. If this
+	 * object is not actually rooted in the Database, the corresponding Database
+	 * Context is located and returned, if it exists.
+	 */
 	public Context getDatabaseContext() {
 		Context exact = Database.instance().getContextForRoot(getRootFolder());
 		if (exact != null) {
@@ -68,6 +81,7 @@ public abstract class FileObjectInfo {
 		return this.name;
 	}
 
+	/** Return path to this object relative to the containing Context folder */
 	public String getRelativeName() {
 		if (this.folder == null) {
 			return "";
@@ -76,24 +90,37 @@ public abstract class FileObjectInfo {
 		return this.folder.getRelativeName() + "/" + this.name;
 	}
 
+	/** Get a File object referencing this object within the current context. */
 	public File getJavaFile() {
 		return getJavaFile(getContext());
 	}
 
+	/**
+	 * Get a Java File object referencing this object. If a context is supplied, the
+	 * File is relative to that context's root folder, otherwise it is relative to
+	 * this object's Context.
+	 */
 	public File getJavaFile(Context context) {
-		return (context != null) ? new File(context.getRootFile(), getRelativeName()) : getRelativeJavaFile();
+		return (context != null) //
+				? new File(context.getRootFile(), getRelativeName()) //
+				: getRelativeJavaFile();
 	}
 
+	/** Get a Java File object referencing this object relative to its context. */
 	public File getRelativeJavaFile() {
 		return new File(getRelativeName());
 	}
 
+	/** Get absolute path to this object within its context */
 	public String getFullName() {
 		File javafile = getJavaFile();
 
 		return javafile.getAbsolutePath();
 	}
 
+	/**
+	 * Get whether this object exists in the filesystem relative to a given context.
+	 */
 	public boolean existsInContext(Context context) {
 		File file = getJavaFile(context);
 

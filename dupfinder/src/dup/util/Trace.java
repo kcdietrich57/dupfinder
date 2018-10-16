@@ -1,5 +1,6 @@
 package dup.util;
 
+/** Configurable tracing facility */
 public class Trace {
 	public static final int NONE = 0;
 	public static final int NORMAL = 1;

@@ -13,25 +13,64 @@ import dup.util.Trace;
 import dup.util.Utility;
 
 public class Context {
-	private String name; // TODO Context name (currenty folder)
-	private String version; // Version of the saved data format
-	private File persistenceFile; // The file containing saved context metadata
-	private boolean dirty; // Changes exist; context should be saved
-	private DetailLevel detailLevel; // How much information has been gathered
+	public static final Comparator<FileInfo> compareFileSize;
 
-	private File rootFolderFile; // Java file for the context root
-	private FolderInfo rootFolder; // Descriptor of the context root
+	static {
+		compareFileSize = new Comparator<FileInfo>() {
+			public int compare(FileInfo f1, FileInfo f2) {
+				long diff = f1.getSize() - f2.getSize();
 
-	private int filecount; // Number of files within the context
-	private int uniquecount; // Number of unique files within the context
-	private long totalsize; // Bytes in all files
+				return (diff == 0) ? 0 : (diff < 0) ? -1 : 1;
+			}
+		};
+	}
 
-	private List<FileInfo> allFiles; // List of files in context, sorted by size
-	private List<DuplicateChain> localDuplicates; // Duplicates in this context
+	/** TODO Context name (currently folder) */
+	private String name;
 
+	/** Version of the saved data format */
+	private String version;
+
+	/** Descriptor of the context root */
+	private FolderInfo rootFolder;
+
+	/** How much information has been gathered */
+	private DetailLevel detailLevel;
+
+	/** Java file for the context root */
+	private File rootFolderFile;
+
+	/** Number of files within the context TODO same as allFiles.size()? */
+	private int filecount;
+
+	/** List of files in context, sorted by size */
+	private List<FileInfo> allFiles;
+
+	/** Number of bytes in all files */
+	private long totalsize;
+
+	/** Number of unique files within the context */
+	private int uniquecount;
+
+	/** Number of non-unique files within the context */
 	private int dupcount;
+
+	/** The file containing saved context metadata */
+	private File persistenceFile;
+
+	/** Changes exist; context should be saved */
+	private boolean dirty;
+
+	/** Duplicates in this context */
+	private List<DuplicateChain> localDuplicates;
+
+	/** Size of the largest group of identical files */
 	private DuplicateChain maxchain;
+
+	/** Number of bytes wasted by all duplicate files */
 	private long waste;
+
+	/** Duplicate chain containing the most wasted bytes */
 	private DuplicateChain maxwaste;
 
 	public final String mutex = "Context.mutex";
@@ -77,6 +116,7 @@ public class Context {
 		this.rootFolder = new FolderInfo(null, this.rootFolderFile);
 	}
 
+	/** Close a context and remove its files from the Database */
 	public void close() {
 		restartAnalysis();
 
@@ -88,6 +128,7 @@ public class Context {
 		this.rootFolder = null;
 	}
 
+	/** Rebuild duplicate information from scratch using current Contexts */
 	private void restartAnalysis() {
 		this.filecount = 0;
 		this.uniquecount = 0;
@@ -99,14 +140,16 @@ public class Context {
 		clearDupFileInfo();
 	}
 
+	/** Reset duplicate counters for a subtree */
 	private void clearDupCount(FolderInfo folder) {
-		folder.dupcount = 0;
+		folder.folderDupCount = 0;
 
 		for (FolderInfo subfolder : folder.getSubfolders()) {
 			clearDupCount(subfolder);
 		}
 	}
 
+	/** Reset duplicate info for all files in this context */
 	private void clearDupFileInfo() {
 		Iterator<FileInfo> iter = this.rootFolder.iterateFiles(true);
 		while (iter.hasNext()) {
@@ -116,20 +159,27 @@ public class Context {
 		}
 	}
 
+	/**
+	 * Get the number of files in the context, optionally resetting the cached value
+	 */
 	public int getFileCount(boolean determine) {
 		if (determine) {
+			this.filecount = 0;
+
 			determineCurrentFileCount();
 		}
 
 		return this.filecount;
 	}
 
+	/** Determine the number of files in this context if not already known */
 	public void determineCurrentFileCount() {
 		if ((this.filecount <= 0) && (this.rootFolder != null)) {
 			this.filecount = this.rootFolder.getTreeFileCount();
 		}
 	}
 
+	/** Determine the minimum detail level for files in this context */
 	public DetailLevel determineDetailLevel() {
 		DetailLevel detail = DetailLevel.Sample;
 
@@ -147,6 +197,7 @@ public class Context {
 		return detail;
 	}
 
+	/** Locate the root folder for this context */
 	public FolderInfo getRoot() {
 		if (this.rootFolder == null) {
 			this.rootFolder = new FolderInfo(null, this.rootFolderFile);
@@ -155,6 +206,7 @@ public class Context {
 		return this.rootFolder;
 	}
 
+	/** Delete information about a file from this context */
 	public void removeFile(FileInfo file) {
 		FolderInfo folder = file.getFolder();
 
@@ -166,6 +218,7 @@ public class Context {
 		setDirty();
 	}
 
+	/** Locate a file in this context (finfo may be an alias) */
 	public FileInfo findFile(FileInfo finfo) {
 		FolderInfo folder = findFolder(finfo.getFolder().getRelativeJavaFile());
 		if (folder == null) {
@@ -175,14 +228,17 @@ public class Context {
 		return folder.findFile(finfo.getName());
 	}
 
+	/** Locate a folder in this context */
 	public FolderInfo findFolder(File folderFile) {
 		return findFolder(folderFile, false);
 	}
 
+	/** Locate or create a folder in this context */
 	public FolderInfo findOrCreateFolder(File folderFile) {
 		return findFolder(folderFile, true);
 	}
 
+	/** Locate a folder in this context, optionally creating it if not present */
 	private FolderInfo findFolder(File folderFile, boolean create) {
 		if ((folderFile == null) || ("".equals(folderFile.getName()))) {
 			return this.rootFolder;
@@ -209,7 +265,7 @@ public class Context {
 			return null;
 		}
 
-		FolderInfo folder = parentFolder.findSubfolder(folderFile.getName());
+		FolderInfo folder = parentFolder.getSubfolder(folderFile.getName());
 
 		if (create && (folder == null)) {
 			folder = new FolderInfo(parentFolder, folderFile);
@@ -219,6 +275,7 @@ public class Context {
 		return folder;
 	}
 
+	/** Build the context from the filesystem */
 	public int ingest() {
 		if (this.detailLevel.isLessThan(DetailLevel.Size)) {
 			return FileUtil.ingestContext(this, DetailLevel.Size);
@@ -227,6 +284,7 @@ public class Context {
 		return getRoot().getTreeFileCount();
 	}
 
+	/** Build a chain containing same-size files in this context */
 	public DuplicateChain getSameSizeFileChain(FileInfo file) {
 		if (this.allFiles.isEmpty()) {
 			return null;
@@ -286,6 +344,7 @@ public class Context {
 		return chain;
 	}
 
+	/** Process files in this context for duplicates */
 	public void analyzeContextDuplicates() {
 		int level = Trace.NORMAL;
 
@@ -317,12 +376,12 @@ public class Context {
 
 		for (FileInfo file : this.allFiles) {
 			if (!file.isUnique()) {
-				++file.getFolder().dupcount;
+				++file.getFolder().folderDupCount;
 			}
 		}
 	}
 
-	/** Put files with the same size into DuplicateChains. */
+	/** Put context files with the same size into DuplicateChains */
 	private void analyzeFileSize() {
 		this.allFiles = new ArrayList<FileInfo>(this.filecount);
 
@@ -406,6 +465,7 @@ public class Context {
 		}
 	}
 
+	/** Build duplicate chains for this context */
 	private void rebuildContextDuplicates() {
 		List<DuplicateChain> verifiedDuplicateChains = new ArrayList<DuplicateChain>();
 
@@ -432,6 +492,7 @@ public class Context {
 		this.localDuplicates.addAll(verifiedDuplicateChains);
 	}
 
+	/** Output description of duplicate chains for this context */
 	private void dumpDuplicateChains(int level, String title) {
 		countDuplicates();
 
@@ -461,6 +522,7 @@ public class Context {
 		Trace.traceln(level);
 	}
 
+	/** Gather statistics for duplicates in this context */
 	private void countDuplicates() {
 		this.dupcount = 0;
 		this.maxchain = null;
@@ -481,19 +543,6 @@ public class Context {
 				this.maxwaste = chain;
 			}
 		}
-	}
-
-	public static final Comparator<FileInfo> compareFileSize;
-
-	static {
-		compareFileSize = new Comparator<FileInfo>() {
-			@Override
-			public int compare(FileInfo f1, FileInfo f2) {
-				long diff = f1.getSize() - f2.getSize();
-
-				return (diff == 0) ? 0 : (diff < 0) ? -1 : 1;
-			}
-		};
 	}
 
 	public String getVersion() {

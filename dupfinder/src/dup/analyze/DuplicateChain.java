@@ -9,20 +9,18 @@ import java.util.Set;
 import dup.model.FileInfo;
 import dup.model.FolderInfo;
 
+/** This represents a group of duplicate files */
 public class DuplicateChain {
 	private List<FileInfo> files;
 
-	public static final Comparator<DuplicateChain> compareSize;
+	public static final Comparator<DuplicateChain> compareSize = //
+			new Comparator<DuplicateChain>() {
+				public int compare(DuplicateChain c1, DuplicateChain c2) {
+					long diff = c1.getFileSize() - c2.getFileSize();
 
-	static {
-		compareSize = new Comparator<DuplicateChain>() {
-			public int compare(DuplicateChain c1, DuplicateChain c2) {
-				long diff = c1.getFileSize() - c2.getFileSize();
-
-				return (diff == 0) ? 0 : (diff < 0) ? -1 : 1;
-			}
-		};
-	}
+					return (diff == 0) ? 0 : (diff < 0) ? -1 : 1;
+				}
+			};
 
 	public DuplicateChain() {
 		this.files = new ArrayList<FileInfo>();
@@ -66,6 +64,7 @@ public class DuplicateChain {
 		return this.files.get(0).getSize();
 	}
 
+	/** Locate folders that contain multiple duplicates from this chain */
 	private List<FolderInfo> getFoldersWithMultipleDuplicates() {
 		Set<FolderInfo> folders = new HashSet<FolderInfo>();
 

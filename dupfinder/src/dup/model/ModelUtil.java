@@ -1,6 +1,7 @@
 package dup.model;
 
 public class ModelUtil {
+	/** Determine the lowest common level of detail for a file/subtree */
 	public static DetailLevel getMinimumDetailLevel(Object[] objs) {
 		DetailLevel minDetail = DetailLevel.Sample;
 

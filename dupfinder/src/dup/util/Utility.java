@@ -9,6 +9,7 @@ import dup.model.Context;
 import dup.model.FileInfo;
 import dup.model.FolderInfo;
 
+/** General utility functions */
 public final class Utility {
 	private static final long K = 1024;
 
@@ -46,6 +47,7 @@ public final class Utility {
 				"bKMGT".charAt(unit));
 	}
 
+	/** Given an array of selected objects, create a list of FileObjects */
 	public static List<FileInfo> gatherFilesFromSelection(Object[] selobjs) {
 		List<FileInfo> files = new ArrayList<FileInfo>();
 

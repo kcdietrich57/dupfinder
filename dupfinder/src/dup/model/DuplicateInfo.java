@@ -3,29 +3,33 @@ package dup.model;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
 import dup.analyze.Analyzer;
 import dup.analyze.Checksum;
-import dup.analyze.Checksum.Checksums;
+import dup.analyze.Checksum.ChecksumValues;
 import dup.analyze.Fingerprint;
 import dup.util.FileUtil;
 import dup.util.Trace;
 import dup.util.Utility;
 
+/** Information about file duplicates shared between duplicate files */
 public class DuplicateInfo {
-	FileInfo file;
+	private static final Collection<FileInfo> NoFiles = Collections.unmodifiableCollection(new ArrayList<FileInfo>());
 
-	Checksums ck = new Checksums();
+	private FileInfo file;
 
-	Set<FileInfo> verifiedDuplicateFiles = null;
-	Set<FileInfo> verifiedDifferentFiles = null;
+	ChecksumValues ck = new ChecksumValues();
 
-	FileInfo nextContextDuplicate = null;
-	Collection<FileInfo> contextDuplicates = null;
-	Collection<FileInfo> globalDuplicates = null;
+	private Set<FileInfo> verifiedDuplicateFiles = null;
+	private Set<FileInfo> verifiedDifferentFiles = null;
+
+	// FileInfo nextContextDuplicate = null;
+	private Collection<FileInfo> contextDuplicates = null;
+	private Collection<FileInfo> globalDuplicates = null;
 
 	public DuplicateInfo(FileInfo file) {
 		this.file = file;
@@ -150,7 +154,7 @@ public class DuplicateInfo {
 
 	public void setPrefixChecksum(int value) {
 		if (this.ck == null) {
-			this.ck = new Checksums();
+			this.ck = new ChecksumValues();
 		}
 
 		this.ck.prefix = value;
@@ -235,21 +239,21 @@ public class DuplicateInfo {
 		++this.file.getFolder().globalDupCount;
 	}
 
-	private static final Collection<FileInfo> NoFiles = new ArrayList<FileInfo>();
-
 	public Collection<FileInfo> getContextDuplicates() {
 		return (this.contextDuplicates != null) ? this.contextDuplicates : NoFiles;
 	}
 
 	/**
-	 * Build duplicate chain for two files (same size) TODO based on current
-	 * information.
+	 * Build duplicate chain for two files (same size)
+	 * 
+	 * TODO based on current information.
 	 * 
 	 * @param other The other file
 	 * @return True if the files are duplicates
 	 */
 	public boolean addFileToDuplicateChain(DuplicateInfo other) {
 		assert this.file.getSize() == other.file.getSize();
+
 		// TODO this doesn't need to go through fileinfo
 		if (!this.file.isDuplicateOf(other.file, false)) {
 			return false;
@@ -416,10 +420,11 @@ public class DuplicateInfo {
 		other.verifiedDifferentFiles.add(this.file);
 	}
 
-	// TODO rename
 	public Collection<FileInfo> getVerifiedDuplicates() {
 		// TODO construct from Database.verifiedIdentical?
-		return (this.verifiedDuplicateFiles != null) ? this.verifiedDuplicateFiles : NoFiles;
+		return (this.verifiedDuplicateFiles != null) //
+				? this.verifiedDuplicateFiles //
+				: NoFiles;
 	}
 
 	public Collection<FileInfo> getVerifiedDifferentFiles() {

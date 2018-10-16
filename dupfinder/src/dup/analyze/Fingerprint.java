@@ -9,7 +9,9 @@ import dup.model.Database;
 import dup.model.FileInfo;
 import dup.util.Trace;
 
+/** Functions related to checksum generation and file comparison */
 public class Fingerprint {
+	/** Determine and remember if two files are duplicates or not */
 	public static boolean filesAreIdentical(FileInfo file1, FileInfo file2) {
 		boolean identical = filesAreIdentical_internal(file1, file2);
 
@@ -22,6 +24,7 @@ public class Fingerprint {
 		return identical;
 	}
 
+	/** Analyze and compare two files */
 	private static boolean filesAreIdentical_internal(FileInfo fileinfo1, FileInfo fileinfo2) {
 		if (Database.skipFileComparison) {
 			Trace.traceln(Trace.VERBOSE, "Skipping file compare...");

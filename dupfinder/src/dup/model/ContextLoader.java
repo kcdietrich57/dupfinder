@@ -7,7 +7,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 
-// Create/reload a persisted context
+/** Functions to create/reload a persisted context */
 class ContextLoader {
 	public static Context loadContextFromFile(File file) {
 		FileInputStream fstream = null;

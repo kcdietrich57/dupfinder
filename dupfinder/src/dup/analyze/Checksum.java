@@ -16,26 +16,28 @@ public abstract class Checksum {
 	public static final int BUFFER_SIZE = 1024;
 	public static final int prefixCount = 1;
 
+	/** Percentage of file data to include in checksum calculations */
 	private static double samplePercent() {
 		return 2.0;
 	}
 
-	public static class Checksums {
+	/** Holds checksum values for a file */
+	public static class ChecksumValues {
 		public int prefix;
 		public int sample;
 		public byte[] sampleBytes;
 
-		public Checksums() {
+		public ChecksumValues() {
 			this.prefix = this.sample = CKSUM_UNDEFINED;
 			this.sampleBytes = null;
 		}
 
 		public boolean equals(Object obj) {
-			if (!(obj instanceof Checksums)) {
+			if (!(obj instanceof ChecksumValues)) {
 				return false;
 			}
 
-			Checksums other = (Checksums) obj;
+			ChecksumValues other = (ChecksumValues) obj;
 
 			if (!compareSums(this.prefix, other.prefix) //
 					|| !compareSums(this.sample, other.sample)) {
@@ -61,19 +63,23 @@ public abstract class Checksum {
 		}
 	}
 
+	/** Holds information about checksums during the process of calculation */
 	private static class Checksums_internal {
-		Checksums checksums = new Checksums();
+		public ChecksumValues checksums = new ChecksumValues();
 
-		MessageDigest msgdigestPrefix = null;
-		MessageDigest msgdigestSample = null;
+		public final MessageDigest msgdigestPrefix;
+		public final MessageDigest msgdigestSample;
 
 		public Checksums_internal(DetailLevel detail) {
+			MessageDigest px = null;
+			MessageDigest sx = null;
+
 			try {
 				switch (detail) {
 				case Sample:
-					this.msgdigestSample = MessageDigest.getInstance("MD5");
+					sx = MessageDigest.getInstance("MD5");
 				case Prefix:
-					this.msgdigestPrefix = MessageDigest.getInstance("MD5");
+					px = MessageDigest.getInstance("MD5");
 					break;
 
 				default:
@@ -82,12 +88,17 @@ public abstract class Checksum {
 			} catch (NoSuchAlgorithmException e) {
 				e.printStackTrace();
 			}
+
+			this.msgdigestPrefix = px;
+			this.msgdigestSample = sx;
 		}
 
-		public void digest() {
+		/** Create the checksum values from the stored digest information */
+		public void processData() {
 			if (this.msgdigestSample != null) {
 				this.checksums.sample = getChecksum(this.msgdigestSample);
 			}
+
 			if (this.msgdigestPrefix != null) {
 				this.checksums.prefix = getChecksum(this.msgdigestPrefix);
 			}
@@ -97,13 +108,15 @@ public abstract class Checksum {
 	public static int checksumCount = 0;
 	public static int samplecount = 0;
 
-	public static Checksums getChecksums(FileInfo finfo, Context context, DetailLevel detail) {
+	/** Calculate checksum(s) for a file */
+	public static ChecksumValues getChecksums(FileInfo finfo, Context context, DetailLevel detail) {
 		assert context != null;
 
 		// Trace.traceln(Trace.VERBOSE, "Calculating checksums for " +
 		// finfo.getName());
 		File file = finfo.getJavaFile(context);
 
+		// Small files don't need checksums
 		if ((file.length() <= BUFFER_SIZE) //
 				&& detail.isGreaterThan(DetailLevel.Prefix)) {
 			detail = DetailLevel.Prefix;
@@ -126,6 +139,7 @@ public abstract class Checksum {
 		return cksums.checksums;
 	}
 
+	/** Process checksum(s) for a file and save results */
 	private static void calcChecksums(File file, Checksums_internal cksums) throws Exception {
 		int sampleFreq = (int) (100.0 / samplePercent());
 		RandomAccessFile raf = null;
@@ -167,7 +181,7 @@ public abstract class Checksum {
 				}
 			}
 
-			cksums.digest();
+			cksums.processData();
 		} finally {
 			if (raf != null) {
 				raf.close();
@@ -175,6 +189,7 @@ public abstract class Checksum {
 		}
 	}
 
+	/** Calculate prefix checksum for a file */
 	public static void calculatePrefixChecksum(FileInfo finfo) {
 		if (finfo.getContext() == null) {
 			return;
@@ -189,10 +204,12 @@ public abstract class Checksum {
 		}
 	}
 
+	/** Load some file content for quick comparison later */
 	public static void loadSampleBytes(FileInfo finfo) {
 		calculatePrefixChecksum(finfo);
 	}
 
+	/** Calculate checksum for sample file data and save results */
 	public static void calculateSampleChecksum(FileInfo finfo) {
 		if (finfo.getContext() == null) {
 			return;
@@ -209,10 +226,12 @@ public abstract class Checksum {
 		}
 	}
 
+	/** Calculate checksum from digest */
 	private static int getChecksum(MessageDigest digest) {
 		return getChecksum(digest.digest());
 	}
 
+	/** Calculate a checksum from digest data */
 	private static int getChecksum(byte[] bb) {
 		if (bb == null) {
 			return 1;
@@ -229,7 +248,9 @@ public abstract class Checksum {
 		return (check == CKSUM_UNDEFINED) ? 1 : check;
 	}
 
-	private static byte[] createChecksumDigest(FileInfo finfo, File file, int count, double percentage)
+	/** Build checksum data by reading file data */
+	private static byte[] createChecksumDigest(FileInfo finfo, File file, //
+			int count, double percentage) //
 			throws Exception {
 		MessageDigest msgdigest = MessageDigest.getInstance("MD5");
 

@@ -6,6 +6,8 @@ public enum DetailLevel {
 	Prefix(2, "Prefix"), //
 	Sample(3, "Sample");
 
+	public static final DetailLevel MAX = Sample;
+
 	int intval;
 	String name;
 

@@ -10,6 +10,7 @@ import dup.model.FileInfo;
 import dup.model.FolderInfo;
 import dup.util.Trace;
 
+/** Helper class to process a group of contexts looking for duplicates */
 public final class Analyzer {
 	public static void analyzeGlobalDuplicates(Collection<Context> contexts) {
 		if (contexts.size() < 2) {
@@ -19,21 +20,26 @@ public final class Analyzer {
 		new Analyzer(contexts).analyze();
 	}
 
+	/** The contexts we are processing */
 	private Collection<Context> contexts;
+	/** All files in all of our contexts, grouped by context */
 	private List<List<FileInfo>> finfos;
+	/** Count of all files */
 	private int totalFileCount;
+	/** Keeps track of current file index per context */
 	private int[] idx;
+	/** The current file size we are considering */
 	private long curFileSize;
+	/** Files that are the current size */
+	private List<FileInfo> samesize = new ArrayList<FileInfo>();
+	/** */
 	private long deadline;
-	private List<FileInfo> samesize;
 
 	private Analyzer(Collection<Context> contexts) {
 		this.contexts = contexts;
 
 		this.idx = new int[this.contexts.size()];
 		this.curFileSize = 0;
-		this.samesize = new ArrayList<FileInfo>();
-
 	}
 
 	private void analyze() {
@@ -48,10 +54,10 @@ public final class Analyzer {
 
 			traceProgress();
 
-			getSameSizeList();
+			List<FileInfo> samesize = getSameSizeList();
 
-			while (this.samesize.size() > 1) {
-				List<FileInfo> dupfiles = getDuplicates();
+			while (samesize.size() > 1) {
+				List<FileInfo> dupfiles = getDuplicates(samesize);
 
 				if (hasGlobalDuplicates(dupfiles)) {
 					for (FileInfo dfile : dupfiles) {
@@ -62,6 +68,7 @@ public final class Analyzer {
 		}
 	}
 
+	/** Return whether a collection of duplicate files includes any global dups */
 	public static boolean hasGlobalDuplicates(Collection<FileInfo> dupfiles) {
 		if ((dupfiles == null) || (dupfiles.size() < 2)) {
 			return false;
@@ -80,12 +87,16 @@ public final class Analyzer {
 		return false;
 	}
 
-	private List<FileInfo> getDuplicates() {
+	/**
+	 * Get list of files in a list that duplicate the first file in the list. Remove
+	 * the duplicate files from the original list and return the new list.
+	 */
+	private List<FileInfo> getDuplicates(List<FileInfo> samesize) {
 		List<FileInfo> dupfiles = null;
 
-		FileInfo file = this.samesize.remove(0);
+		FileInfo file = samesize.remove(0);
 
-		for (Iterator<FileInfo> iter = this.samesize.iterator(); iter.hasNext();) {
+		for (Iterator<FileInfo> iter = samesize.iterator(); iter.hasNext();) {
 			FileInfo file2 = iter.next();
 
 			if (file.isDuplicateOf(file2, true)) {
@@ -103,17 +114,20 @@ public final class Analyzer {
 		return dupfiles;
 	}
 
-	private void getSameSizeList() {
-		this.samesize.clear();
+	/** Build list of files of the current size. Empty list if no duplicates */
+	private List<FileInfo> getSameSizeList() {
+		List<FileInfo> samesize = this.samesize;
+
+		samesize.clear();
 
 		FileInfo firstfile = null;
 
-		for (int ii = 0; ii < this.idx.length; ++ii) {
-			List<FileInfo> list = this.finfos.get(ii);
-			int idx = this.idx[ii];
+		for (int contextNum = 0; contextNum < this.idx.length; ++contextNum) {
+			List<FileInfo> contextFiles = this.finfos.get(contextNum);
+			int idx = this.idx[contextNum];
 
-			while (list.size() > idx) {
-				FileInfo finfo = list.get(idx);
+			while (contextFiles.size() > idx) {
+				FileInfo finfo = contextFiles.get(idx);
 
 				if (finfo.getSize() != this.curFileSize) {
 					break;
@@ -122,19 +136,22 @@ public final class Analyzer {
 				if (firstfile == null) {
 					firstfile = finfo;
 				} else {
-					this.samesize.add(finfo);
+					samesize.add(finfo);
 				}
 
 				++idx;
-				++this.idx[ii];
+				++this.idx[contextNum];
 			}
 		}
 
-		if (!this.samesize.isEmpty()) {
-			this.samesize.add(firstfile);
+		if (!samesize.isEmpty()) {
+			samesize.add(firstfile);
 		}
+
+		return samesize;
 	}
 
+	/** Build lists of files per context and total file count */
 	private void gatherContextFiles() {
 		this.finfos = new ArrayList<List<FileInfo>>();
 
@@ -146,6 +163,7 @@ public final class Analyzer {
 		}
 	}
 
+	/** Trace progress of analysis */
 	private void traceProgress() {
 		if (System.currentTimeMillis() >= this.deadline) {
 			this.deadline += 1000;
@@ -157,6 +175,7 @@ public final class Analyzer {
 		}
 	}
 
+	/** Return total count of files remaining to process */
 	private int countRemainingFiles() {
 		int remaining = this.totalFileCount;
 
@@ -167,7 +186,9 @@ public final class Analyzer {
 		return remaining;
 	}
 
+	/** Look through next file in each context to find the next potential dups */
 	private boolean determineNextSize() {
+		// TODO look at determineNextSize - verify/describe algorithm
 		for (;;) {
 			int minidx = -1;
 			long minsize = Long.MAX_VALUE;
@@ -180,6 +201,7 @@ public final class Analyzer {
 				}
 
 				FileInfo file = list.get(this.idx[ii]);
+
 				if (file.getSize() < minsize) {
 					secondsize = minsize;
 					minsize = file.getSize();
@@ -199,7 +221,8 @@ public final class Analyzer {
 			}
 
 			List<FileInfo> list = this.finfos.get(minidx);
-			while (this.idx[minidx] < list.size() && list.get(this.idx[minidx]).getSize() < secondsize) {
+			while ((this.idx[minidx] < list.size()) //
+					&& list.get(this.idx[minidx]).getSize() < secondsize) {
 				++this.idx[minidx];
 			}
 		}

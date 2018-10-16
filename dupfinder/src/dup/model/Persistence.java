@@ -9,9 +9,6 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.nio.file.Path;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
 
 import dup.model.Database.DupDiffFileInfo;
 import dup.model.Database.RegisteredDupDiffInfo;
@@ -56,22 +53,22 @@ public class Persistence {
 		return null;
 	}
 
-	public static void saveDatabase() {
-		PrintStream ps = null;
-		try {
-			File dbfile = new File(dbfolder, "__DB__.dat");
-
-			ps = new PrintStream(dbfile);
-
-			Persistence.saveDatabase(ps);
-		} catch (Exception e) {
-			e.printStackTrace();
-		} finally {
-			if (ps != null) {
-				ps.close();
-			}
-		}
-	}
+//	private static void saveDatabase() {
+//		PrintStream ps = null;
+//		try {
+//			File dbfile = new File(dbfolder, "__DB__.dat");
+//
+//			ps = new PrintStream(dbfile);
+//
+//			Persistence.saveDatabase(ps);
+//		} catch (Exception e) {
+//			e.printStackTrace();
+//		} finally {
+//			if (ps != null) {
+//				ps.close();
+//			}
+//		}
+//	}
 
 	public static void loadDatabase() {
 		File dbfile = new File(dbfolder, "__DB__.dat");
@@ -92,7 +89,8 @@ public class Persistence {
 			v = Persistence.parseLineWithString(br.readLine(), "Version:");
 
 			if (!v.equals(Persistence.VERSION)) {
-				throw new Exception("Data file version mismatch: " + v + " Expected: " + Persistence.VERSION);
+				throw new Exception("Data file version mismatch: " + v //
+						+ " Expected: " + Persistence.VERSION);
 			}
 
 			String line = br.readLine();
@@ -252,74 +250,74 @@ public class Persistence {
 		}
 	}
 
-	private static void saveDatabase(PrintStream ps) {
-		Database db = Database.instance();
-
-		if (!db.isDirty()) {
-			// TODO return;
-		}
-
-		ps.println("DATABASE");
-		ps.println("Version:" + VERSION);
-
-		for (Map.Entry<String, RegisteredDupDiffInfo> entry : //
-		Database.instance().getRegisteredDupDiffInfo().entrySet()) {
-			String key = entry.getKey();
-			RegisteredDupDiffInfo info = entry.getValue();
-
-			if ((info == null) || info.differentFiles.isEmpty()) {
-				continue;
-			}
-
-			ps.println("Registered Differences:");
-			ps.println(encodeString(key));
-
-			ps.println(hexString(info.differentFiles.size()) //
-					+ " " + hexString(info.filesize) //
-					+ " " + hexString(info.timestamp) //
-					+ " " + hexString(info.psum) //
-					+ " " + hexString(info.ssum));
-
-			for (DupDiffFileInfo f : info.differentFiles) {
-				ps.println("Diff:" //
-						+ encodeString(f.filename) //
-						+ " " + hexString(f.timestamp));
-			}
-		}
-
-		Set<String> keys = new HashSet<String>(//
-				Database.instance().getRegisteredDupDiffInfo().keySet());
-
-		while (!keys.isEmpty()) {
-			String key = keys.iterator().next();
-			keys.remove(key);
-
-			RegisteredDupDiffInfo info = Database.instance().getRegisteredDupDiffInfo(key);
-
-			if (info.duplicateFiles.isEmpty()) {
-				continue;
-			}
-
-			ps.println("Registered Duplicates:");
-			ps.println(encodeString(key));
-
-			ps.println(hexString(info.differentFiles.size()) //
-					+ " " + hexString(info.filesize) //
-					+ " " + hexString(info.timestamp) //
-					+ " " + hexString(info.psum) //
-					+ " " + hexString(info.ssum));
-
-			for (DupDiffFileInfo file : info.duplicateFiles) {
-				keys.remove(file);
-
-				ps.println("Dup:" //
-						+ encodeString(file.filename) //
-						+ " " + hexString(file.timestamp));
-			}
-		}
-
-		db.setDirty(false);
-	}
+//	private static void saveDatabase(PrintStream ps) {
+//		Database db = Database.instance();
+//
+//		if (!db.isDirty()) {
+//			// TODO return;
+//		}
+//
+//		ps.println("DATABASE");
+//		ps.println("Version:" + VERSION);
+//
+//		for (Map.Entry<String, RegisteredDupDiffInfo> entry : //
+//		Database.instance().getRegisteredDupDiffInfo().entrySet()) {
+//			String key = entry.getKey();
+//			RegisteredDupDiffInfo info = entry.getValue();
+//
+//			if ((info == null) || info.differentFiles.isEmpty()) {
+//				continue;
+//			}
+//
+//			ps.println("Registered Differences:");
+//			ps.println(encodeString(key));
+//
+//			ps.println(hexString(info.differentFiles.size()) //
+//					+ " " + hexString(info.filesize) //
+//					+ " " + hexString(info.timestamp) //
+//					+ " " + hexString(info.psum) //
+//					+ " " + hexString(info.ssum));
+//
+//			for (DupDiffFileInfo f : info.differentFiles) {
+//				ps.println("Diff:" //
+//						+ encodeString(f.filename) //
+//						+ " " + hexString(f.timestamp));
+//			}
+//		}
+//
+//		Set<String> keys = new HashSet<String>(//
+//				Database.instance().getRegisteredDupDiffInfo().keySet());
+//
+//		while (!keys.isEmpty()) {
+//			String key = keys.iterator().next();
+//			keys.remove(key);
+//
+//			RegisteredDupDiffInfo info = Database.instance().getRegisteredDupDiffInfo(key);
+//
+//			if (info.duplicateFiles.isEmpty()) {
+//				continue;
+//			}
+//
+//			ps.println("Registered Duplicates:");
+//			ps.println(encodeString(key));
+//
+//			ps.println(hexString(info.differentFiles.size()) //
+//					+ " " + hexString(info.filesize) //
+//					+ " " + hexString(info.timestamp) //
+//					+ " " + hexString(info.psum) //
+//					+ " " + hexString(info.ssum));
+//
+//			for (DupDiffFileInfo file : info.duplicateFiles) {
+//				keys.remove(file);
+//
+//				ps.println("Dup:" //
+//						+ encodeString(file.filename) //
+//						+ " " + hexString(file.timestamp));
+//			}
+//		}
+//
+//		db.setDirty(false);
+//	}
 
 	private static void save(Context context, PrintStream ps) {
 		File rootFile = context.getRootFile();
