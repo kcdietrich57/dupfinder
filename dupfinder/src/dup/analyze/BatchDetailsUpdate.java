@@ -66,7 +66,7 @@ public class BatchDetailsUpdate {
 				continue;
 			}
 
-			Checksum.ChecksumValues checksums = Checksum.getChecksums( //
+			ChecksumValues checksums = Checksum.getChecksums( //
 					ufile.origfile, this.context, this.targetDetailLevel);
 			ufile.origfile.setChecksums(checksums);
 		}

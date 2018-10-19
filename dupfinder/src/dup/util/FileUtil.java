@@ -11,6 +11,7 @@ import java.util.Arrays;
 import java.util.Iterator;
 
 import dup.analyze.Checksum;
+import dup.analyze.ChecksumValues;
 import dup.analyze.DetailLevel;
 import dup.model.Context;
 import dup.model.FileInfo;
@@ -183,7 +184,7 @@ public class FileUtil {
 			FileInfo finfo = fileiter.next();
 
 			if (finfo.getDetailLevel().isLessThan(detail)) {
-				Checksum.ChecksumValues checksums = Checksum.getChecksums(finfo, context, detail);
+				ChecksumValues checksums = Checksum.getChecksums(finfo, context, detail);
 				finfo.setChecksums(checksums);
 
 				++filecount;

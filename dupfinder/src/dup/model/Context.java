@@ -13,7 +13,7 @@ import dup.util.FileUtil;
 import dup.util.Trace;
 import dup.util.Utility;
 
-public class Context {
+public class Context implements Comparable<Context> {
 	public static final Comparator<FileInfo> compareFileSize;
 
 	static {
@@ -25,6 +25,10 @@ public class Context {
 			}
 		};
 	}
+
+	private static int nextid = 1;
+
+	private int id;
 
 	/** TODO Context name (currently folder) */
 	private String name;
@@ -77,6 +81,8 @@ public class Context {
 	public final String mutex = "Context.mutex";
 
 	private Context() {
+		this.id = nextid++;
+
 		this.persistenceFile = null;
 		this.version = null;
 		this.dirty = false;
@@ -115,6 +121,10 @@ public class Context {
 		this.detailLevel = other.detailLevel;
 		this.rootFolderFile = other.rootFolderFile;
 		this.rootFolder = new FolderInfo(null, this.rootFolderFile);
+	}
+
+	public int compareTo(Context other) {
+		return this.id - other.id;
 	}
 
 	/** Close a context and remove its files from the Database */
@@ -474,7 +484,7 @@ public class Context {
 			for (int ii = 0; ii < chain.getNumFiles(); ++ii) {
 				FileInfo f1 = chain.getFileInfo(ii);
 
-				if (!f1.hasLocalDuplicates()) {
+				if (!f1.hasContextDuplicates()) {
 					chain.removeFile(ii);
 					++this.localUniqueCount;
 					continue;

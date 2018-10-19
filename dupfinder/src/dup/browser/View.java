@@ -145,11 +145,11 @@ public class View {
 			FileInfo file = iter.next();
 
 			if (file.hasGlobalDuplicates()) {
-				if (!file.hasLocalDuplicates()) {
+				if (!file.hasContextDuplicates()) {
 					globalDups.add(file);
 					iter.remove();
 				}
-			} else if (file.hasLocalDuplicates()) {
+			} else if (file.hasContextDuplicates()) {
 				contextDups.add(file);
 				iter.remove();
 			}

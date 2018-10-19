@@ -40,7 +40,7 @@ public class FoldersTreeCellRenderer extends DefaultTreeCellRenderer {
 
 			if (file.getSize() == 0) {
 				icon = UIUtility.getIcon("imgEmptyFile", "");
-			} else if (file.hasLocalDuplicates()) {
+			} else if (file.hasContextDuplicates()) {
 				String iconname = (file.hasGlobalDuplicates()) ? "imgDuplicateFile" : "imgLocalDupFile";
 				icon = UIUtility.getIcon(iconname, "");
 			} else if (file.hasGlobalDuplicates()) {

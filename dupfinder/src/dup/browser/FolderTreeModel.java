@@ -119,7 +119,7 @@ class TreeModelFilter {
 
 		if (showUniqueFiles() && file.isUnique()) {
 			b = true;
-		} else if (showLocalDuplicateFiles() && file.hasLocalDuplicates()) {
+		} else if (showLocalDuplicateFiles() && file.hasContextDuplicates()) {
 			b = true;
 		} else if (showGlobalDuplicateFiles() && file.hasGlobalDuplicates()) {
 			b = true;

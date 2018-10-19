@@ -1,20 +1,17 @@
 package dup.analyze;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import dup.analyze.Checksum.ChecksumValues;
 import dup.model.Database;
 import dup.model.FileInfo;
 import dup.model.FolderInfo;
 import dup.util.FileUtil;
 import dup.util.Trace;
-import dup.util.Utility;
 
 /** Information about file duplicates shared between duplicate files */
 public class DuplicateInfo {
@@ -22,12 +19,9 @@ public class DuplicateInfo {
 
 	private FileInfo file;
 
-	public ChecksumValues ck = new ChecksumValues();
-
 	private Set<FileInfo> verifiedDuplicateFiles = null;
 	private Set<FileInfo> verifiedDifferentFiles = null;
 
-	// FileInfo nextContextDuplicate = null;
 	private Set<FileInfo> contextDuplicates = null;
 	private Collection<FileInfo> globalDuplicates = null;
 
@@ -90,25 +84,7 @@ public class DuplicateInfo {
 		this.verifiedDifferentFiles.remove(file);
 	}
 
-	public DetailLevel getDetailLevel() {
-		if (this.ck != null) {
-			if (this.ck.sample != Checksum.CKSUM_UNDEFINED) {
-				return DetailLevel.Sample;
-			}
-
-			if (this.ck.prefix != Checksum.CKSUM_UNDEFINED) {
-				return DetailLevel.Prefix;
-			}
-		}
-
-		if (this.file.getSize() >= 0) {
-			return DetailLevel.Size;
-		}
-
-		return DetailLevel.None;
-	}
-
-	public boolean hasLocalDuplicates() {
+	public boolean hasContextDuplicates() {
 		return (this.contextDuplicates != null) && !this.contextDuplicates.isEmpty();
 	}
 
@@ -118,14 +94,6 @@ public class DuplicateInfo {
 
 	public boolean hasDuplicatesInFolder() {
 		FolderInfo folder = this.file.getFolder();
-
-		// for (FileInfo file = this.nextContextDuplicate; //
-		// (file != null) && (file != this.file); //
-		// file = file.getDupinfo().nextContextDuplicate) {
-		// if (file.getFolder() == folder) {
-		// return true;
-		// }
-		// }
 
 		for (FileInfo file : this.contextDuplicates) {
 			if ((file != this.file) && (file.getFolder() == folder)) {
@@ -144,88 +112,12 @@ public class DuplicateInfo {
 		return (this.globalDuplicates != null) ? this.globalDuplicates.size() : 0;
 	}
 
-	public int getPrefixChecksum(boolean calc) {
-		if (calc && ((this.ck == null) || (this.ck.prefix == 0))) {
-			Fingerprint.calculatePrefixChecksum(this.file);
-		}
-
-		return this.ck.prefix;
-	}
-
-	public void setPrefixChecksum(int value) {
-		if (this.ck == null) {
-			this.ck = new ChecksumValues();
-		}
-
-		this.ck.prefix = value;
-	}
-
-	public byte[] getSampleBytes(boolean calc) {
-		if (calc && (this.file.getContext() != null) //
-				&& ((this.ck == null) || (this.ck.sampleBytes == null))) {
-			Fingerprint.loadSampleBytes(this.file);
-		}
-
-		return this.ck.sampleBytes;
-	}
-
-	public void setSampleBytes(byte[] bytes, int length) {
-		this.ck.sampleBytes = Arrays.copyOf(bytes, length);
-	}
-
-	public int getSampleChecksum(boolean calc) {
-		if (calc && ((this.ck == null) || (this.ck.sample == 0))) {
-			Fingerprint.calculateSampleChecksum(this.file);
-		}
-
-		return this.ck.sample;
-	}
-
 	public boolean equals(Object o) {
 		if (!(o instanceof DuplicateInfo)) {
 			return false;
 		}
 
-		return this.ck.equals(((DuplicateInfo) o).ck);
-	}
-
-	/**
-	 * Given that this file is the same size as another, Is my file a duplicate?
-	 * This will optionally compare file contents.
-	 * 
-	 * @param other        The other file
-	 * @param compareFiles Whether to compare contents if necessary
-	 * @return True if the files are duplicates by our best information
-	 */
-	public boolean isDuplicateOf(FileInfo other, boolean compareFiles) {
-		if (this.verifiedDifferentFiles.contains(other)) {
-			return false;
-		}
-
-		if ((this.verifiedDuplicateFiles != null) //
-				&& this.verifiedDuplicateFiles.contains(other)) {
-			return true;
-		}
-
-		if (Database.instance().isRegisteredDifferentFile(this.file, other)) {
-			addToVerifiedDifferent(other.getDupinfo());
-			return false;
-		}
-
-		if (Database.instance().isRegisteredDuplicateFile(this.file, other)) {
-			addToVerifiedDuplicate(other.getDupinfo());
-			return true;
-		}
-
-		if (!checksumsMatch(other) //
-				// TODO I believe we have already checked this above
-				|| !isVerifiedEqual(other.getDupinfo())) {
-			return false;
-		}
-
-		compareFiles = false;
-		return !compareFiles //
-				|| Fingerprint.filesAreIdentical(this.file, other);
+		return this.file.checksums.equals(((DuplicateInfo) o).file.checksums);
 	}
 
 	public Collection<FileInfo> getGlobalDuplicates() {
@@ -254,7 +146,7 @@ public class DuplicateInfo {
 	public boolean addFileToDuplicateChain(DuplicateInfo other) {
 		assert this.file.getSize() == other.file.getSize();
 
-		if (!isDuplicateOf(other.file, false)) {
+		if (!this.file.isDuplicateOf(other.file, false)) {
 			return false;
 		}
 
@@ -320,7 +212,7 @@ public class DuplicateInfo {
 		}
 	}
 
-	private boolean isVerifiedEqual(DuplicateInfo other) {
+	public boolean isVerifiedEqual(DuplicateInfo other) {
 		if (this.verifiedDifferentFiles.contains(other.file)) {
 			return false;
 		}
@@ -358,41 +250,11 @@ public class DuplicateInfo {
 		return same;
 	}
 
-	private boolean isIgnoredFile(FileInfo finfo) {
-		if (finfo.getSize() == 0) {
-			return true;
-		}
-		if (finfo.getName().equals(".DS_Store")) {
-			return true;
-		}
-
-		return false;
-	}
-
-	public boolean checksumsMatch(FileInfo other) {
-		if (isIgnoredFile(this.file) || isIgnoredFile(other)) {
-			return false;
-		}
-
-		if ((this.file.getSize() != other.getSize()) //
-				|| !Utility.checksumsMatch(getPrefixChecksum(true), other.getPrefixChecksum(true)) //
-				|| !Utility.bytesMatch(getSampleBytes(true), other.getSampleBytes(true)) //
-				|| !Utility.checksumsMatch(getSampleChecksum(true), other.getSampleChecksum(true)) //
-		// TODO || !Utility.checksumsMatch(getFullChecksum(context),
-		// other.getFullChecksum(otherContext))
-		) {
-			return false;
-		}
-
-		return true; // isVerifiedEqual(context, otherContext,
-						// other.getDupinfo());
-	}
-
 	private boolean compareContents(DuplicateInfo other) {
 		return FileUtil.compareContents(this.file, other.file);
 	}
 
-	private void addToVerifiedDuplicate(DuplicateInfo other) {
+	public void addToVerifiedDuplicate(DuplicateInfo other) {
 		if (this.verifiedDuplicateFiles == null && other.verifiedDuplicateFiles != null) {
 			this.verifiedDuplicateFiles = other.verifiedDuplicateFiles;
 			this.verifiedDuplicateFiles.add(this.file);
@@ -414,7 +276,7 @@ public class DuplicateInfo {
 		}
 	}
 
-	private void addToVerifiedDifferent(DuplicateInfo other) {
+	public void addToVerifiedDifferent(DuplicateInfo other) {
 		this.verifiedDifferentFiles.add(other.file);
 		other.verifiedDifferentFiles.add(this.file);
 	}

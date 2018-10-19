@@ -162,6 +162,7 @@ public class Database {
 
 		this.contexts.add(context);
 
+		normalizeDuplicateInfo();
 		context.analyzeContextDuplicates();
 
 		Trace.traceln(Trace.NORMAL);
@@ -180,6 +181,10 @@ public class Database {
 		reportMemory("After loading context " + contextName);
 
 		return context;
+	}
+	
+	private void normalizeDuplicateInfo() {
+		
 	}
 
 	public static void reportMemory(String when) {

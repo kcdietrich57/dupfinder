@@ -10,56 +10,14 @@ import dup.model.Context;
 import dup.model.FileInfo;
 import dup.util.Trace;
 
+/** Functions for calculating checksums for files */
 public abstract class Checksum {
-	public static final int CKSUM_UNDEFINED = 0;
 	public static final int BUFFER_SIZE = 1024;
 	public static final int prefixCount = 1;
 
 	/** Percentage of file data to include in checksum calculations */
 	private static double samplePercent() {
 		return 2.0;
-	}
-
-	/** Holds checksum values for a file */
-	public static class ChecksumValues {
-		public int prefix;
-		public int sample;
-		public byte[] sampleBytes;
-
-		public ChecksumValues() {
-			this.prefix = this.sample = CKSUM_UNDEFINED;
-			this.sampleBytes = null;
-		}
-
-		public boolean equals(Object obj) {
-			if (!(obj instanceof ChecksumValues)) {
-				return false;
-			}
-
-			ChecksumValues other = (ChecksumValues) obj;
-
-			if (!compareSums(this.prefix, other.prefix) //
-					|| !compareSums(this.sample, other.sample)) {
-				return false;
-			}
-
-			boolean b = (sampleBytes == null) || (other.sampleBytes == null) //
-					|| Arrays.equals(this.sampleBytes, other.sampleBytes);
-
-			if (!b) {
-				Trace.traceln(Trace.DEBUG, "False positive on checksum");
-			}
-
-			return b;
-		}
-
-		private boolean compareSums(int sum1, int sum2) {
-			if ((sum1 == Checksum.CKSUM_UNDEFINED) || (sum2 == Checksum.CKSUM_UNDEFINED)) {
-				return true;
-			}
-
-			return sum1 == sum2;
-		}
 	}
 
 	/** Holds information about checksums during the process of calculation */
@@ -244,7 +202,7 @@ public abstract class Checksum {
 			check |= (x ^ b);
 		}
 
-		return (check == CKSUM_UNDEFINED) ? 1 : check;
+		return (check == ChecksumValues.CKSUM_UNDEFINED) ? 1 : check;
 	}
 
 	/** Build checksum data by reading file data */

@@ -1,25 +1,40 @@
 package dup.model;
 
 import java.io.File;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 
 import dup.analyze.Checksum;
+import dup.analyze.ChecksumValues;
 import dup.analyze.DetailLevel;
 import dup.analyze.DuplicateInfo;
+import dup.analyze.DuplicateInfo2;
+import dup.analyze.Fingerprint;
+import dup.util.Utility;
 
 /** Class representing a file object */
 public class FileInfo extends FileObjectInfo {
 	private long filesize;
 	private long timestamp;
+	public final ChecksumValues checksums;
 
-	private DuplicateInfo dupinfo = new DuplicateInfo(this);
+	private DuplicateInfo2 dupinfo2;
+	private DuplicateInfo dupinfo;
+
+	public FileInfo(FolderInfo folder, String name, long size, long modified) {
+		super(folder, name);
+
+		this.filesize = size;
+		this.timestamp = modified;
+		// TODO this should be null if no same-size files exist?
+		this.checksums = new ChecksumValues();
+		this.dupinfo2 = null;
+		this.dupinfo = new DuplicateInfo(this);
+	}
 
 	public FileInfo(FolderInfo folder, File file) {
-		super(folder, file.getName());
-
-		this.filesize = file.length();
-		this.timestamp = file.lastModified();
+		this(folder, file.getName(), file.length(), file.lastModified());
 	}
 
 	public FileInfo(FolderInfo folder, FileInfo file) {
@@ -27,15 +42,15 @@ public class FileInfo extends FileObjectInfo {
 
 		this.timestamp = file.timestamp;
 		this.filesize = file.filesize;
+		this.checksums = file.checksums;
+
 		// TODO bad alias here, copy instead
+		this.dupinfo2 = file.dupinfo2;
 		this.dupinfo = file.dupinfo;
 	}
 
-	public FileInfo(FolderInfo folder, String name, long size, long modified) {
-		super(folder, name);
-
-		this.filesize = size;
-		this.timestamp = modified;
+	public ChecksumValues getChecksums() {
+		return this.checksums;
 	}
 
 	/**
@@ -47,7 +62,64 @@ public class FileInfo extends FileObjectInfo {
 	 * @return True if the files are duplicates by our best information
 	 */
 	public boolean isDuplicateOf(FileInfo other, boolean compareFiles) {
-		return getDupinfo().isDuplicateOf(other, compareFiles);
+		if (this.dupinfo.getVerifiedDifferentFiles().contains(other)) {
+			return false;
+		}
+
+		if ((this.dupinfo.getVerifiedDuplicates() != null) //
+				&& this.dupinfo.getVerifiedDuplicates().contains(other)) {
+			return true;
+		}
+
+		if (Database.instance().isRegisteredDifferentFile(this, other)) {
+			this.dupinfo.addToVerifiedDifferent(other.getDupinfo());
+			return false;
+		}
+
+		if (Database.instance().isRegisteredDuplicateFile(this, other)) {
+			this.dupinfo.addToVerifiedDuplicate(other.getDupinfo());
+			return true;
+		}
+
+		if (!checksumsMatch(other) //
+				// TODO I believe we have already checked this above
+				|| !this.dupinfo.isVerifiedEqual(other.getDupinfo())) {
+			return false;
+		}
+
+		compareFiles = false;
+		return !compareFiles //
+				|| Fingerprint.filesAreIdentical(this, other);
+	}
+
+	public boolean checksumsMatch(FileInfo other) {
+		if (isIgnoredFile(this) || isIgnoredFile(other)) {
+			return false;
+		}
+
+		if ((this.getSize() != other.getSize()) //
+				|| !Utility.checksumsMatch(this.getPrefixChecksum(true), other.getPrefixChecksum(true)) //
+				|| !Utility.bytesMatch(this.getSampleBytes(true), other.getSampleBytes(true)) //
+				|| !Utility.checksumsMatch(this.getSampleChecksum(true), other.getSampleChecksum(true)) //
+		// TODO || !Utility.checksumsMatch(this.getFullChecksum(context),
+		// other.getFullChecksum(otherContext))
+		) {
+			return false;
+		}
+
+		return true; // isVerifiedEqual(context, otherContext,
+						// other.getDupinfo());
+	}
+
+	private boolean isIgnoredFile(FileInfo finfo) {
+		if (finfo.getSize() == 0) {
+			return true;
+		}
+		if (finfo.getName().equals(".DS_Store")) {
+			return true;
+		}
+
+		return false;
 	}
 
 	public void clearDuplicateInfoForRestart() {
@@ -57,6 +129,7 @@ public class FileInfo extends FileObjectInfo {
 	public void dispose() {
 		this.dupinfo.dispose();
 		this.dupinfo = null;
+		this.dupinfo2 = null;
 	}
 
 	/**
@@ -99,11 +172,11 @@ public class FileInfo extends FileObjectInfo {
 	}
 
 	public boolean isUnique() {
-		return !(hasLocalDuplicates() || hasGlobalDuplicates());
+		return !(hasContextDuplicates() || hasGlobalDuplicates());
 	}
 
-	public boolean hasLocalDuplicates() {
-		return getDupinfo().hasLocalDuplicates();
+	public boolean hasContextDuplicates() {
+		return getDupinfo().hasContextDuplicates();
 	}
 
 	public boolean hasGlobalDuplicates() {
@@ -123,7 +196,13 @@ public class FileInfo extends FileObjectInfo {
 	}
 
 	public DetailLevel getDetailLevel() {
-		return getDupinfo().getDetailLevel();
+		DetailLevel level = this.checksums.getDetailLevel();
+
+		if (level == DetailLevel.Size) {
+			return (getSize() >= 0) ? DetailLevel.Size : DetailLevel.None;
+		}
+
+		return level;
 	}
 
 	public void calcChecksums(Context context, DetailLevel detail) {
@@ -139,29 +218,33 @@ public class FileInfo extends FileObjectInfo {
 	}
 
 	public int getPrefixChecksum(boolean calc) {
-		return getDupinfo().getPrefixChecksum(calc);
+		if (calc && ((this.checksums == null) || (this.checksums.prefix == 0))) {
+			Fingerprint.calculatePrefixChecksum(this);
+		}
+
+		return this.checksums.prefix;
+	}
+
+	public void setSampleChecksum(int value) {
+		this.checksums.sample = value;
 	}
 
 	public int getSampleChecksum(boolean calc) {
-		return getDupinfo().getSampleChecksum(calc);
+		if (calc && (this.checksums.sample == 0)) {
+			Fingerprint.calculateSampleChecksum(this);
+		}
+
+		return this.checksums.sample;
 	}
 
-	public void setChecksums(Checksum.ChecksumValues checksums) {
-		if (checksums.prefix != Checksum.CKSUM_UNDEFINED) {
-			setPrefixChecksum(checksums.prefix);
-		}
-
-		if (checksums.sampleBytes != null) {
-			setSampleBytes(checksums.sampleBytes);
-		}
-
-		if (checksums.sample != Checksum.CKSUM_UNDEFINED) {
-			setSampleChecksum(checksums.sample);
+	public void setChecksums(ChecksumValues checksums) {
+		if (!this.checksums.equals(checksums)) {
+			this.checksums.setValues(checksums);
 		}
 	}
 
 	public void setPrefixChecksum(int value) {
-		getDupinfo().setPrefixChecksum(value);
+		this.checksums.prefix = value;
 	}
 
 	public byte[] getSampleBytes() {
@@ -169,19 +252,16 @@ public class FileInfo extends FileObjectInfo {
 	}
 
 	public byte[] getSampleBytes(boolean calc) {
-		return getDupinfo().getSampleBytes(calc);
-	}
+		if (calc && (getContext() != null) && (this.checksums.sampleBytes == null)) {
+			Fingerprint.loadSampleBytes(this);
+		}
 
-	private void setSampleBytes(byte[] bytes) {
-		setSampleBytes(bytes, bytes.length);
+		return this.checksums.sampleBytes;
 	}
 
 	public void setSampleBytes(byte[] bytes, int length) {
-		getDupinfo().setSampleBytes(bytes, length);
-	}
-
-	public void setSampleChecksum(int value) {
-		getDupinfo().ck.sample = value;
+		// getDupinfo().setSampleBytes(bytes, length);
+		this.checksums.sampleBytes = Arrays.copyOf(bytes, length);
 	}
 
 	public boolean hasDuplicatesInFolder() {
