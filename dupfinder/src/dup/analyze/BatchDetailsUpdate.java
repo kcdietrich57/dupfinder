@@ -1,9 +1,11 @@
-package dup.model;
+package dup.analyze;
 
 import java.util.ArrayList;
 import java.util.List;
 
-import dup.analyze.Checksum;
+import dup.model.Context;
+import dup.model.Database;
+import dup.model.FileInfo;
 import dup.util.Trace;
 
 public class BatchDetailsUpdate {

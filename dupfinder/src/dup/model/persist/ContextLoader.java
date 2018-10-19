@@ -1,4 +1,4 @@
-package dup.model;
+package dup.model.persist;
 
 import java.io.BufferedReader;
 import java.io.DataInputStream;
@@ -7,8 +7,13 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 
+import dup.analyze.DetailLevel;
+import dup.model.Context;
+import dup.model.FileInfo;
+import dup.model.FolderInfo;
+
 /** Functions to create/reload a persisted context */
-class ContextLoader {
+public class ContextLoader {
 	public static Context loadContextFromFile(File file) {
 		FileInputStream fstream = null;
 		DataInputStream in = null;

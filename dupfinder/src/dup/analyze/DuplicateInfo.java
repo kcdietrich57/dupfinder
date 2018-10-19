@@ -1,4 +1,4 @@
-package dup.model;
+package dup.analyze;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -8,10 +8,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import dup.analyze.Analyzer;
-import dup.analyze.Checksum;
 import dup.analyze.Checksum.ChecksumValues;
-import dup.analyze.Fingerprint;
+import dup.model.Database;
+import dup.model.FileInfo;
+import dup.model.FolderInfo;
 import dup.util.FileUtil;
 import dup.util.Trace;
 import dup.util.Utility;
@@ -22,13 +22,13 @@ public class DuplicateInfo {
 
 	private FileInfo file;
 
-	ChecksumValues ck = new ChecksumValues();
+	public ChecksumValues ck = new ChecksumValues();
 
 	private Set<FileInfo> verifiedDuplicateFiles = null;
 	private Set<FileInfo> verifiedDifferentFiles = null;
 
 	// FileInfo nextContextDuplicate = null;
-	private Collection<FileInfo> contextDuplicates = null;
+	private Set<FileInfo> contextDuplicates = null;
 	private Collection<FileInfo> globalDuplicates = null;
 
 	public DuplicateInfo(FileInfo file) {
@@ -254,12 +254,11 @@ public class DuplicateInfo {
 	public boolean addFileToDuplicateChain(DuplicateInfo other) {
 		assert this.file.getSize() == other.file.getSize();
 
-		// TODO this doesn't need to go through fileinfo
-		if (!this.file.isDuplicateOf(other.file, false)) {
+		if (!isDuplicateOf(other.file, false)) {
 			return false;
 		}
 
-		Collection<FileInfo> dups = null;
+		Set<FileInfo> dups = null;
 
 		if (this.contextDuplicates != null) {
 			dups = this.contextDuplicates;

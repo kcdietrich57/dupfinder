@@ -11,11 +11,11 @@ import java.util.Arrays;
 import java.util.Iterator;
 
 import dup.analyze.Checksum;
+import dup.analyze.DetailLevel;
 import dup.model.Context;
-import dup.model.DetailLevel;
 import dup.model.FileInfo;
 import dup.model.FolderInfo;
-import dup.model.Persistence;
+import dup.model.persist.Persistence;
 
 public class FileUtil {
 	private static final LinkOption[] NO_LINK_OPTIONS = new LinkOption[0];

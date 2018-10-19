@@ -7,7 +7,6 @@ import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 
 import dup.model.Context;
-import dup.model.DetailLevel;
 import dup.model.FileInfo;
 import dup.util.Trace;
 

@@ -5,6 +5,8 @@ import java.util.Collection;
 import java.util.List;
 
 import dup.analyze.Checksum;
+import dup.analyze.DetailLevel;
+import dup.analyze.DuplicateInfo;
 
 /** Class representing a file object */
 public class FileInfo extends FileObjectInfo {

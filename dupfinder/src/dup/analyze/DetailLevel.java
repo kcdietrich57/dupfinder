@@ -1,4 +1,4 @@
-package dup.model;
+package dup.analyze;
 
 public enum DetailLevel {
 	None(0, "None"), //

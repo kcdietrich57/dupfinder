@@ -118,12 +118,12 @@ public abstract class FileObjectInfo {
 		return javafile.getAbsolutePath();
 	}
 
-	/**
-	 * Get whether this object exists in the filesystem relative to a given context.
-	 */
-	public boolean existsInContext(Context context) {
-		File file = getJavaFile(context);
-
-		return file.exists();
-	}
+//	/**
+//	 * Get whether this object exists in the filesystem relative to a given context.
+//	 */
+//	public boolean existsInContext(Context context) {
+//		File file = getJavaFile(context);
+//
+//		return file.exists();
+//	}
 }

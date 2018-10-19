@@ -8,9 +8,9 @@ import javax.swing.AbstractAction;
 import javax.swing.Action;
 import javax.swing.Icon;
 
+import dup.analyze.DetailLevel;
 import dup.model.Context;
 import dup.model.Database;
-import dup.model.DetailLevel;
 import dup.model.FileInfo;
 import dup.util.Utility;
 

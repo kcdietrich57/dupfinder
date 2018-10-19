@@ -7,6 +7,7 @@ import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 
+import dup.analyze.DetailLevel;
 import dup.analyze.DuplicateChain;
 import dup.util.FileUtil;
 import dup.util.Trace;
@@ -50,7 +51,7 @@ public class Context {
 	private long totalsize;
 
 	/** Number of unique files within the context */
-	private int uniquecount;
+	private int localUniqueCount;
 
 	/** Number of non-unique files within the context */
 	private int dupcount;
@@ -101,7 +102,7 @@ public class Context {
 		this.dirty = false;
 
 		this.filecount = 0;
-		this.uniquecount = 0;
+		this.localUniqueCount = 0;
 	}
 
 	/** Create a dummy clone context */
@@ -131,7 +132,7 @@ public class Context {
 	/** Rebuild duplicate information from scratch using current Contexts */
 	private void restartAnalysis() {
 		this.filecount = 0;
-		this.uniquecount = 0;
+		this.localUniqueCount = 0;
 		this.dupcount = 0;
 
 		this.localDuplicates.clear();
@@ -407,7 +408,7 @@ public class Context {
 			int sscount = lastidx - ii;
 
 			if (sscount == 1) {
-				++this.uniquecount;
+				++this.localUniqueCount;
 			} else {
 				DuplicateChain newchain = new DuplicateChain();
 
@@ -475,7 +476,7 @@ public class Context {
 
 				if (!f1.hasLocalDuplicates()) {
 					chain.removeFile(ii);
-					++this.uniquecount;
+					++this.localUniqueCount;
 					continue;
 				}
 
@@ -498,7 +499,7 @@ public class Context {
 
 		Trace.traceln(level, title);
 
-		Trace.traceln(level, " Unique: " + this.uniquecount);
+		Trace.traceln(level, " Unique: " + this.localUniqueCount);
 
 		Trace.trace(level, " Dups: " + this.dupcount);
 		Trace.trace(level, " in " + this.localDuplicates.size() + " groups");
@@ -558,7 +559,7 @@ public class Context {
 	}
 
 	public int getUniqueFileCount() {
-		return this.uniquecount;
+		return this.localUniqueCount;
 	}
 
 	public DetailLevel getDetailLevel() {

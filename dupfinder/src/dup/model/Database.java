@@ -11,6 +11,8 @@ import dup.analyze.Analyzer;
 import dup.analyze.Checksum;
 import dup.browser.FolderTreeModel;
 import dup.browser.View;
+import dup.model.persist.ContextLoader;
+import dup.model.persist.Persistence;
 import dup.util.FileUtil;
 import dup.util.Trace;
 import dup.util.Utility;

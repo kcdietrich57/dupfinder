@@ -28,11 +28,11 @@ import javax.swing.event.TreeSelectionEvent;
 import javax.swing.event.TreeSelectionListener;
 import javax.swing.tree.TreePath;
 
+import dup.analyze.DetailLevel;
+import dup.analyze.ModelUtil;
 import dup.model.Context;
-import dup.model.DetailLevel;
 import dup.model.FileInfo;
 import dup.model.FolderInfo;
-import dup.model.ModelUtil;
 import dup.util.Trace;
 import dup.util.Utility;
 

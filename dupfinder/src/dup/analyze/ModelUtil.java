@@ -1,4 +1,8 @@
-package dup.model;
+package dup.analyze;
+
+import dup.model.Context;
+import dup.model.FileInfo;
+import dup.model.FolderInfo;
 
 public class ModelUtil {
 	/** Determine the lowest common level of detail for a file/subtree */

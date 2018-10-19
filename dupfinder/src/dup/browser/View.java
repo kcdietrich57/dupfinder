@@ -13,9 +13,9 @@ import java.util.Set;
 
 import javax.swing.JToolBar;
 
+import dup.analyze.DetailLevel;
 import dup.model.Context;
 import dup.model.Database;
-import dup.model.DetailLevel;
 import dup.model.FileInfo;
 import dup.model.FileObjectInfo;
 import dup.model.FolderInfo;

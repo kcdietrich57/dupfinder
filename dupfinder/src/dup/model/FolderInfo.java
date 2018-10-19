@@ -8,6 +8,8 @@ import java.util.List;
 import java.util.Set;
 import java.util.StringTokenizer;
 
+import dup.analyze.DetailLevel;
+
 public class FolderInfo extends FileObjectInfo {
 	private final List<FolderInfo> folders = new ArrayList<FolderInfo>();
 	private final List<FileInfo> files = new ArrayList<FileInfo>();
