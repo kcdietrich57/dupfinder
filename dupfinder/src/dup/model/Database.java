@@ -3,12 +3,15 @@ package dup.model;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import dup.analyze.Analyzer;
 import dup.analyze.Checksum;
+import dup.analyze.DuplicateInfo2;
 import dup.browser.FolderTreeModel;
 import dup.browser.View;
 import dup.model.persist.ContextLoader;
@@ -36,6 +39,8 @@ public class Database {
 	private static Database instance = null;
 
 	private List<Context> contexts = new ArrayList<Context>();
+	private List<FileInfo> files = new ArrayList<FileInfo>();
+	private List<DuplicateInfo2> duplicates = new ArrayList<DuplicateInfo2>();
 
 	private FolderTreeModel model = null;
 	private View view = null;
@@ -130,6 +135,66 @@ public class Database {
 		}
 	}
 
+	public void addFile(FileInfo file) {
+		int idx = FileUtil.addFile(this.files, file);
+
+		boolean isdup = false;
+		if ((idx > 0) && (this.files.get(idx - 1).getSize() == file.getSize())) {
+			isdup = true;
+		} else if ((idx + 1 < this.files.size()) //
+				&& (this.files.get(idx + 1).getSize() == file.getSize())) {
+			isdup = true;
+		}
+
+		if (isdup) {
+			addFileToDuplicates(file);
+		}
+	}
+
+	class DummyDupInfo extends DuplicateInfo2 {
+		public long size = 0;
+
+		public DummyDupInfo(long size) {
+			this.size = size;
+		}
+
+		public long fileSize() {
+			return this.size;
+		}
+	}
+
+	private void addFileToDuplicates(FileInfo file) {
+		DuplicateInfo2 dupinfo = getDupinfo(file.getSize());
+
+		dupinfo.addFile(file);
+	}
+
+	private DuplicateInfo2 getDupinfo(long size) {
+		int idx = Collections.binarySearch(this.duplicates, //
+				new DummyDupInfo(size), //
+				new Comparator<DuplicateInfo2>() {
+					public int compare(DuplicateInfo2 d1, DuplicateInfo2 d2) {
+						long diff = d1.fileSize() - d2.fileSize();
+						if (diff < 0) {
+							return -1;
+						} else if (diff > 0) {
+							return 1;
+						} else {
+							return 0;
+						}
+					}
+				});
+
+		if (idx >= 0) {
+			return this.duplicates.get(idx);
+		}
+
+		DuplicateInfo2 dupinfo = new DuplicateInfo2();
+		this.duplicates.add(-idx - 1, dupinfo);
+
+		return dupinfo;
+	}
+
 	/**
 	 * Set up a context. If the folder is already open, return the existing context.
 	 * Otherwise, we create a new context. The context name is qualified if
@@ -163,6 +228,7 @@ public class Database {
 		this.contexts.add(context);
 
 		normalizeDuplicateInfo();
+
 		context.analyzeContextDuplicates();
 
 		Trace.traceln(Trace.NORMAL);
@@ -182,9 +248,36 @@ public class Database {
 
 		return context;
 	}
-	
+
 	private void normalizeDuplicateInfo() {
-		
+//		int dupidx = 0;
+//		FileInfo lastfile = null;
+//
+//		for (FileInfo file : this.files) {
+//			while ((dupidx < this.duplicates.size()) //
+//					&& (this.duplicates.get(dupidx).fileSize() < file.getSize())) {
+//				++dupidx;
+//			}
+//
+//			DuplicateInfo2 dupinfo = (dupidx < this.duplicates.size()) //
+//					? this.duplicates.get(dupidx) //
+//					: null;
+//
+//			assert dupinfo == null || dupinfo.fileSize() >= file.getSize();
+//
+//			if ((dupinfo != null) && (dupinfo.fileSize() == file.getSize())) {
+//			} else if ((lastfile != null) && (lastfile.getSize() == file.getSize())) {
+//				dupinfo = new DuplicateInfo2();
+//				dupinfo.addFile(lastfile);
+//				this.duplicates.add(dupidx, dupinfo);
+//			}
+//
+//			lastfile = file;
+//		}
+
+		for (DuplicateInfo2 dupinfo : this.duplicates) {
+			dupinfo.normalize();
+		}
 	}
 
 	public static void reportMemory(String when) {

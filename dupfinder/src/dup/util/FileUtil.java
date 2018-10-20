@@ -8,12 +8,16 @@ import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.Iterator;
+import java.util.List;
 
 import dup.analyze.Checksum;
 import dup.analyze.ChecksumValues;
 import dup.analyze.DetailLevel;
 import dup.model.Context;
+import dup.model.Database;
 import dup.model.FileInfo;
 import dup.model.FolderInfo;
 import dup.model.persist.Persistence;
@@ -140,6 +144,31 @@ public class FileUtil {
 
 	private static int loadCounter = 0;
 
+	public static int addFile(List<FileInfo> files, FileInfo file) {
+		int idx = Collections.binarySearch(files, file, //
+				new Comparator<FileInfo>() {
+					public int compare(FileInfo f1, FileInfo f2) {
+						long diff = f1.getSize() - f2.getSize();
+
+						if (diff < 0) {
+							return -1;
+						} else if (diff == 0) {
+							return 0;
+						} else {
+							return 1;
+						}
+					}
+				});
+
+		if (idx < 0) {
+			idx = -(idx + 1);
+		}
+
+		files.add(idx, file);
+
+		return idx;
+	}
+
 	private static int ingestTree(Context context, FolderInfo folder) {
 		if (folder == null) {
 			return 0;
@@ -159,6 +188,8 @@ public class FileUtil {
 				FileInfo fileInfo = new FileInfo(folder, child);
 
 				folder.addFile(fileInfo);
+				Database.instance().addFile(fileInfo);
+				context.addFile(fileInfo);
 
 				if ((++loadCounter % 1000) == 0) {
 					Trace.trace(Trace.NORMAL, ".");

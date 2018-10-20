@@ -2,7 +2,6 @@ package dup.model;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
@@ -90,7 +89,7 @@ public class Context implements Comparable<Context> {
 		this.rootFolderFile = null;
 		this.rootFolder = null;
 
-		this.allFiles = null;
+		this.allFiles = new ArrayList<FileInfo>();
 		this.localDuplicates = new ArrayList<DuplicateChain>();
 
 		this.dupcount = 0;
@@ -392,18 +391,20 @@ public class Context implements Comparable<Context> {
 		}
 	}
 
+	public void addFile(FileInfo file) {
+		FileUtil.addFile(this.allFiles, file);
+	}
+
 	/** Put context files with the same size into DuplicateChains */
 	private void analyzeFileSize() {
-		this.allFiles = new ArrayList<FileInfo>(this.filecount);
-
-		Iterator<FileInfo> iter = this.rootFolder.iterateFiles(true);
-		while (iter.hasNext()) {
-			FileInfo file = iter.next();
-
-			this.allFiles.add(file);
-		}
-
-		Collections.sort(this.allFiles, compareFileSize);
+//		Iterator<FileInfo> iter = this.rootFolder.iterateFiles(true);
+//		while (iter.hasNext()) {
+//			FileInfo file = iter.next();
+//
+//			addFile(file);
+//		}
+//
+//		Collections.sort(this.allFiles, compareFileSize);
 
 		for (int ii = 0; ii < this.filecount;) {
 			FileInfo file = this.allFiles.get(ii);

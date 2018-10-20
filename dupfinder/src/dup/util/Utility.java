@@ -13,11 +13,21 @@ import dup.model.FolderInfo;
 public final class Utility {
 	private static final long K = 1024;
 
-	public static boolean checksumsMatch(int cksum1, int cksum2) {
+	public static boolean checksumsAreIdentical(int cksum1, int cksum2) {
+		return ((cksum1 != 0) && (cksum2 != 0) //
+				&& (cksum1 == cksum2));
+	}
+
+	public static boolean bytesAreIdentical(byte[] bytes1, byte[] bytes2) {
+		return ((bytes1 != null) && (bytes2 != null) //
+				&& Arrays.equals(bytes1, bytes2));
+	}
+
+	public static boolean checksumsAreCompatible(int cksum1, int cksum2) {
 		return (cksum1 == 0) || (cksum2 == 0) || (cksum1 == cksum2);
 	}
 
-	public static boolean bytesMatch(byte[] bytes1, byte[] bytes2) {
+	public static boolean bytesAreCompatible(byte[] bytes1, byte[] bytes2) {
 		return (bytes1 == null) || (bytes2 == null) //
 				|| Arrays.equals(bytes1, bytes2);
 	}

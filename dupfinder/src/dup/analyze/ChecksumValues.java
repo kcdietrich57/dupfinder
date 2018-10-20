@@ -88,4 +88,10 @@ public class ChecksumValues implements Comparable<ChecksumValues> {
 
 		return (sum2 == CKSUM_UNDEFINED) ? 1 : (sum1 - sum2);
 	}
+
+	public String toString() {
+		return String.format("Cksum: p=%d s=%d sbLen=%d", //
+				this.prefix, this.sample, //
+				((this.sampleBytes != null) ? this.sampleBytes.length : 0));
+	}
 }

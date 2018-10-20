@@ -19,7 +19,7 @@ public class FileInfo extends FileObjectInfo {
 	private long timestamp;
 	public final ChecksumValues checksums;
 
-	private DuplicateInfo2 dupinfo2;
+	public DuplicateInfo2 dupinfo2;
 	private DuplicateInfo dupinfo;
 
 	public FileInfo(FolderInfo folder, String name, long size, long modified) {
@@ -98,9 +98,9 @@ public class FileInfo extends FileObjectInfo {
 		}
 
 		if ((this.getSize() != other.getSize()) //
-				|| !Utility.checksumsMatch(this.getPrefixChecksum(true), other.getPrefixChecksum(true)) //
-				|| !Utility.bytesMatch(this.getSampleBytes(true), other.getSampleBytes(true)) //
-				|| !Utility.checksumsMatch(this.getSampleChecksum(true), other.getSampleChecksum(true)) //
+				|| !Utility.checksumsAreCompatible(this.getPrefixChecksum(true), other.getPrefixChecksum(true)) //
+				|| !Utility.bytesAreCompatible(this.getSampleBytes(true), other.getSampleBytes(true)) //
+				|| !Utility.checksumsAreCompatible(this.getSampleChecksum(true), other.getSampleChecksum(true)) //
 		// TODO || !Utility.checksumsMatch(this.getFullChecksum(context),
 		// other.getFullChecksum(otherContext))
 		) {
@@ -192,7 +192,11 @@ public class FileInfo extends FileObjectInfo {
 	}
 
 	public String toString() {
-		return "File[" + getName() + "]";
+		String ctxname = (getContext() != null) ? getContext().getName() : "N/A";
+		return String.format("File[%s] cx=%s sz=%d det=%s %s", //
+				getName(), ctxname, getSize(), //
+				getDetailLevel().toString(), //
+				this.checksums.toString());
 	}
 
 	public DetailLevel getDetailLevel() {

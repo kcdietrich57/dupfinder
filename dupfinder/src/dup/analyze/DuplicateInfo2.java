@@ -3,6 +3,7 @@ package dup.analyze;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -10,6 +11,8 @@ import dup.model.Context;
 import dup.model.FileInfo;
 
 public class DuplicateInfo2 {
+	private long filesize = -1;
+
 	/** All files in this group (same size), sorted by checksum info */
 	private List<FileInfo> sameSizeFiles;
 
@@ -18,6 +21,11 @@ public class DuplicateInfo2 {
 
 	public DuplicateInfo2() {
 		this.sameSizeFiles = new ArrayList<FileInfo>();
+		this.duplicateFiles = new HashMap<ChecksumValues, List<FileInfo>>();
+	}
+
+	public long fileSize() {
+		return this.filesize;
 	}
 
 	/**
@@ -30,6 +38,8 @@ public class DuplicateInfo2 {
 	 */
 	public void addFile(FileInfo file) {
 		this.sameSizeFiles.add(file);
+		this.filesize = file.getSize();
+		file.dupinfo2 = this;
 
 //		Collections.sort(this.sameSizeFiles, new Comparator<FileInfo>() {
 //			public int compare(FileInfo f1, FileInfo f2) {
@@ -38,8 +48,36 @@ public class DuplicateInfo2 {
 //		});
 	}
 
+	public DetailLevel getMaxDetail() {
+		DetailLevel max = DetailLevel.None;
+
+		for (FileInfo file : this.sameSizeFiles) {
+			if (file.getDetailLevel().isGreaterThan(max)) {
+				max = file.getDetailLevel();
+
+				if (max == DetailLevel.MAX) {
+					break;
+				}
+			}
+		}
+
+		return max;
+	}
+
 	/** Raise detail level of files to be consistent with each other */
 	public void normalize() {
+		DetailLevel max = getMaxDetail();
+		// Remember if we changed any checksums
+		boolean fixed = false;
+
+		for (FileInfo file : this.sameSizeFiles) {
+			file.getContext();
+			if (file.getDetailLevel().isLessThan(max)) {
+				file.calcChecksums(file.getContext(), max);
+				fixed = true;
+			}
+		}
+
 		Collections.sort(this.sameSizeFiles, new Comparator<FileInfo>() {
 			public int compare(FileInfo f1, FileInfo f2) {
 				int diff = f1.getDetailLevel().compareTo(f2.getDetailLevel());
@@ -51,37 +89,34 @@ public class DuplicateInfo2 {
 			}
 		});
 
-		// Identify ranges of files with compatible checksums
-		int start = -1;
-		int end = 0;
-
-		// Remember if we changed any checksums
-		boolean fixed = false;
-
-		while (end < this.sameSizeFiles.size()) {
-			start = end;
-			++end;
-
-			boolean fix = false;
-			DetailLevel maxdetail = this.sameSizeFiles.get(start).getDetailLevel();
-
-			while ((end < this.sameSizeFiles.size()) //
-					&& this.sameSizeFiles.get(start).checksumsMatch(this.sameSizeFiles.get(end))) {
-				DetailLevel detail = this.sameSizeFiles.get(end).getDetailLevel();
-
-				if (detail.compareTo(maxdetail) > 0) {
-					fix = true;
-					maxdetail = detail;
-				}
-
-				++end;
-			}
-
-			if (fix) {
-				normalizeFiles(start, end, maxdetail);
-				fixed = true;
-			}
-		}
+//		// Identify ranges of files with compatible checksums
+//		int start = -1;
+//		int end = 0;
+//
+//		while (end < this.sameSizeFiles.size()) {
+//			start = end;
+//			++end;
+//
+//			boolean fix = false;
+//			DetailLevel maxdetail = this.sameSizeFiles.get(start).getDetailLevel();
+//
+//			while ((end < this.sameSizeFiles.size()) //
+//					&& this.sameSizeFiles.get(start).checksumsMatch(this.sameSizeFiles.get(end))) {
+//				DetailLevel detail = this.sameSizeFiles.get(end).getDetailLevel();
+//
+//				if (detail.compareTo(maxdetail) > 0) {
+//					fix = true;
+//					maxdetail = detail;
+//				}
+//
+//				++end;
+//			}
+//
+//			if (fix) {
+//				normalizeFiles(start, end, maxdetail);
+//				fixed = true;
+//			}
+//		}
 
 		if (fixed) {
 			// Rebuild duplicate chains using new information
@@ -111,14 +146,17 @@ public class DuplicateInfo2 {
 		}
 	}
 
-	/** Increase detail level of a group of files to a desired level */
-	private void normalizeFiles(int start, int end, DetailLevel detail) {
-		for (int idx = start; idx < end; ++idx) {
-			FileInfo file = this.sameSizeFiles.get(idx);
-
-			file.calcChecksums(file.getContext(), detail);
-		}
-	}
+//	/** Increase detail level of a group of files to a desired level */
+//	private void normalizeFiles(int start, int end, DetailLevel detail) {
+//		for (int idx = start; idx < end; ++idx) {
+//			FileInfo file = this.sameSizeFiles.get(idx);
+//			DetailLevel lvl = file.getDetailLevel();
+//
+//			if (lvl.isLessThan(detail)) {
+//				file.calcChecksums(file.getContext(), detail);
+//			}
+//		}
+//	}
 
 	public boolean hasDuplicates() {
 		// TODO I don't know if I will have lists with just one file yet
@@ -161,5 +199,16 @@ public class DuplicateInfo2 {
 
 	public void processFiles() {
 
+	}
+
+	public String toString() {
+		StringBuffer sb = new StringBuffer();
+
+		sb.append(String.format("DuplicateInfo: sz=%d files=%d chains=%d", //
+				this.sameSizeFiles.get(0).getSize(), //
+				this.sameSizeFiles.size(), //
+				this.duplicateFiles.size()));
+
+		return sb.toString();
 	}
 }
