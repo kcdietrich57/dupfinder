@@ -6,11 +6,9 @@ import java.util.List;
 
 /** Generic info about folder/file */
 public abstract class FileObjectInfo {
+	public final int contextid;
 	private FolderInfo folder;
 	private String name;
-
-	/** For files, the file size; for folders, the tree size */
-	public abstract long getSize();
 
 	public FileObjectInfo(FolderInfo folder, File file) {
 		this(folder, file.getName());
@@ -19,7 +17,18 @@ public abstract class FileObjectInfo {
 	public FileObjectInfo(FolderInfo folder, String name) {
 		this.folder = folder;
 		this.name = name;
+
+		this.contextid = (folder != null) ? folder.contextid : 0;
 	}
+
+	public FileObjectInfo(int contextid, File file) {
+		this.folder = null;
+		this.name = file.getName();
+		this.contextid = contextid;
+	}
+
+	/** For files, the file size; for folders, the tree size */
+	public abstract long getSize();
 
 	/** Build list of ancestor objects - Starting with Database */
 	public Object[] getPathFromRoot() {

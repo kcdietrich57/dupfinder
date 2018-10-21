@@ -16,9 +16,9 @@ public class Fingerprint {
 		boolean identical = filesAreIdentical_internal(file1, file2);
 
 		if (identical) {
-			Database.instance().registerDuplicateFile(file1, file2);
+			RegisteredDupDiffInfo.registerDuplicateFile(file1, file2);
 		} else {
-			Database.instance().registerDifferentFile(file1, file2);
+			RegisteredDupDiffInfo.registerDifferentFile(file1, file2);
 		}
 
 		return identical;
@@ -43,11 +43,11 @@ public class Fingerprint {
 			return false;
 		}
 
-		if (Database.instance().isRegisteredDifferentFile(fileinfo1, fileinfo2)) {
+		if (RegisteredDupDiffInfo.isRegisteredDifferentFile(fileinfo1, fileinfo2)) {
 			return false;
 		}
 
-		if (Database.instance().isRegisteredDuplicateFile(fileinfo1, fileinfo2)) {
+		if (RegisteredDupDiffInfo.isRegisteredDuplicateFile(fileinfo1, fileinfo2)) {
 			return true;
 		}
 

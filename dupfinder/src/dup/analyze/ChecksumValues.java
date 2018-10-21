@@ -6,6 +6,37 @@ import java.util.Arrays;
 public class ChecksumValues implements Comparable<ChecksumValues> {
 	public static final int CKSUM_UNDEFINED = 0;
 
+	private static boolean sumsAreEqual(int sum1, int sum2) {
+		return compareSums(sum1, sum2) == 0;
+	}
+
+	private static int compareSums(int sum1, int sum2) {
+		if (sum1 == CKSUM_UNDEFINED) {
+			return (sum2 == CKSUM_UNDEFINED) ? 0 : -1;
+		}
+
+		return (sum2 == CKSUM_UNDEFINED) ? 1 : (sum1 - sum2);
+	}
+
+	public static boolean isIdentical(int cksum1, int cksum2) {
+		return ((cksum1 != 0) && (cksum2 != 0) //
+				&& (cksum1 == cksum2));
+	}
+
+	public static boolean isIdentical(byte[] bytes1, byte[] bytes2) {
+		return ((bytes1 != null) && (bytes2 != null) //
+				&& Arrays.equals(bytes1, bytes2));
+	}
+
+	public static boolean checksumsAreCompatible(int cksum1, int cksum2) {
+		return (cksum1 == 0) || (cksum2 == 0) || (cksum1 == cksum2);
+	}
+
+	public static boolean bytesAreCompatible(byte[] bytes1, byte[] bytes2) {
+		return (bytes1 == null) || (bytes2 == null) //
+				|| Arrays.equals(bytes1, bytes2);
+	}
+
 	public int prefix;
 	public int sample;
 	public byte[] sampleBytes;
@@ -51,6 +82,7 @@ public class ChecksumValues implements Comparable<ChecksumValues> {
 		if (diff != 0) {
 			return diff;
 		}
+
 		diff = compareSums(this.sample, other.sample);
 		if (diff != 0) {
 			return diff;
@@ -75,18 +107,6 @@ public class ChecksumValues implements Comparable<ChecksumValues> {
 		}
 
 		return 0;
-	}
-
-	private boolean sumsAreEqual(int sum1, int sum2) {
-		return compareSums(sum1, sum2) == 0;
-	}
-
-	private int compareSums(int sum1, int sum2) {
-		if (sum1 == CKSUM_UNDEFINED) {
-			return (sum2 == CKSUM_UNDEFINED) ? 0 : -1;
-		}
-
-		return (sum2 == CKSUM_UNDEFINED) ? 1 : (sum1 - sum2);
 	}
 
 	public String toString() {

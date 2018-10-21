@@ -5,15 +5,12 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import dup.analyze.Analyzer;
 import dup.analyze.Checksum;
+import dup.analyze.DupDiffFileInfo;
 import dup.analyze.DuplicateInfo2;
-import dup.browser.FolderTreeModel;
-import dup.browser.View;
 import dup.model.persist.ContextLoader;
 import dup.model.persist.Persistence;
 import dup.util.FileUtil;
@@ -21,6 +18,7 @@ import dup.util.Trace;
 import dup.util.Utility;
 
 public class Database {
+	public static Collection<DupDiffFileInfo> NoFiles = new ArrayList<DupDiffFileInfo>();
 	public static boolean skipFileComparison = false;
 
 	public static Database instance() {
@@ -42,15 +40,10 @@ public class Database {
 	private List<FileInfo> files = new ArrayList<FileInfo>();
 	private List<DuplicateInfo2> duplicates = new ArrayList<DuplicateInfo2>();
 
-	private FolderTreeModel model = null;
-	private View view = null;
-
-	private Map<String, RegisteredDupDiffInfo> registeredDupDiffInfo;
-	private boolean dirty = false;
+	/** TODO Flags whether the file model is initialized yet */
+	private boolean modelAvailable = false;
 
 	private Database() {
-		this.registeredDupDiffInfo = new HashMap<String, RegisteredDupDiffInfo>();
-
 		FileUtil.setupDBFolder();
 
 		// this.contextMonitor = new ContextMonitor(this);
@@ -61,24 +54,17 @@ public class Database {
 		return this.contexts;
 	}
 
-	public FolderTreeModel getModel() {
-		return this.model;
-	}
-
-	public void setModel(FolderTreeModel model) {
-		this.model = model;
-	}
-
-	public void setView(View view) {
-		this.view = view;
+	public void setModelAvailable(boolean yesno) {
+		this.modelAvailable = yesno;
 	}
 
 	// =========================================================
 	// System management
 	// =========================================================
 
-	// Housekeeping to do when exiting
-	// Load/save dirty contexts before closing
+	/**
+	 * Housekeeping to do when exiting - Load/save dirty contexts before closing
+	 */
 	public void shutDown() {
 		// TODO shut down loading thread
 		for (Context context : this.contexts) {
@@ -94,6 +80,7 @@ public class Database {
 		instance = null;
 	}
 
+	/** Load saved contexts */
 	private void load() {
 		if (Persistence.getDbFolder() == null) {
 			return;
@@ -115,18 +102,16 @@ public class Database {
 		analyzeDuplicates();
 	}
 
-	// =========================================================
-	// Context management
-	// =========================================================
-
+	/** Close a context */
 	public void closeContext(Context context) {
 		if (this.contexts.contains(context)) {
-			// saveContext(context);
+			// TODO autosave - saveContext(context);
 			this.contexts.remove(context);
 			analyzeDuplicates();
 		}
 	}
 
+	/** Persist duplicate information for a context */
 	public void saveContext(Context context) {
 		if (this.contexts.contains(context)) {
 			if (context.isDirty()) {
@@ -135,6 +120,7 @@ public class Database {
 		}
 	}
 
+	/** Add a file (while ingesting a context) */
 	public void addFile(FileInfo file) {
 		int idx = FileUtil.addFile(this.files, file);
 
@@ -151,7 +137,8 @@ public class Database {
 		}
 	}
 
-	class DummyDupInfo extends DuplicateInfo2 {
+	/** Dummy dupinfo for searching by file size */
+	private static class DummyDupInfo extends DuplicateInfo2 {
 		public long size = 0;
 
 		public DummyDupInfo(long size) {
@@ -163,12 +150,14 @@ public class Database {
 		}
 	}
 
+	/** Add file to existing duplicate info database */
 	private void addFileToDuplicates(FileInfo file) {
 		DuplicateInfo2 dupinfo = getDupinfo(file.getSize());
 
 		dupinfo.addFile(file);
 	}
 
+	/** Get the duplicate info for a given file size */
 	private DuplicateInfo2 getDupinfo(long size) {
 		int idx = Collections.binarySearch(this.duplicates, //
 				new DummyDupInfo(size), //
@@ -196,22 +185,23 @@ public class Database {
 	}
 
 	/**
-	 * Set up a context. If the folder is already open, return the existing context.
-	 * Otherwise, we create a new context. The context name is qualified if
-	 * necessary to make it unique.
+	 * Set up a new context for a folder.<br>
+	 * If the folder is already open, return the existing context. <br>
+	 * Otherwise, we create a new context. <br>
+	 * The context name is qualified if necessary to make it unique.
 	 */
 	public Context openContext(String folderPath, String contextName) {
 		Checksum.checksumCount = 0;
 		FileUtil.compareCount = 0;
 
-		// TODO check context overlap (one context is a subtree of another
+		// TODO check for context overlap (one context is a subtree of another
 		// in the filesystem)
 		Context context = findLoadedContext(folderPath);
 		if (context != null) {
 			return context;
 		}
 
-		reportMemory("Before loading context " + contextName);
+		Utility.reportMemory("Before loading context " + contextName);
 
 		long start = System.currentTimeMillis();
 		Trace.traceln(Trace.NORMAL, "Loading context " + contextName);
@@ -221,14 +211,14 @@ public class Database {
 			context = ContextLoader.loadContextFromFile(savedContext);
 		} else {
 			contextName = getUniqueContextName(contextName);
-
 			context = ingestNewContext(folderPath, contextName);
 		}
 
 		this.contexts.add(context);
 
-		normalizeDuplicateInfo();
+		processFiles();
 
+		// TODO the following analysis methods are defunct
 		context.analyzeContextDuplicates();
 
 		Trace.traceln(Trace.NORMAL);
@@ -244,49 +234,16 @@ public class Database {
 		// TODO when to save the registered dup/diff info?
 		// Persistence.saveDatabase();
 
-		reportMemory("After loading context " + contextName);
+		Utility.reportMemory("After loading context " + contextName);
 
 		return context;
 	}
 
-	private void normalizeDuplicateInfo() {
-//		int dupidx = 0;
-//		FileInfo lastfile = null;
-//
-//		for (FileInfo file : this.files) {
-//			while ((dupidx < this.duplicates.size()) //
-//					&& (this.duplicates.get(dupidx).fileSize() < file.getSize())) {
-//				++dupidx;
-//			}
-//
-//			DuplicateInfo2 dupinfo = (dupidx < this.duplicates.size()) //
-//					? this.duplicates.get(dupidx) //
-//					: null;
-//
-//			assert dupinfo == null || dupinfo.fileSize() >= file.getSize();
-//
-//			if ((dupinfo != null) && (dupinfo.fileSize() == file.getSize())) {
-//			} else if ((lastfile != null) && (lastfile.getSize() == file.getSize())) {
-//				dupinfo = new DuplicateInfo2();
-//				dupinfo.addFile(lastfile);
-//				this.duplicates.add(dupidx, dupinfo);
-//			}
-//
-//			lastfile = file;
-//		}
-
+	/** Perform analysis on each group of same-size files */
+	private void processFiles() {
 		for (DuplicateInfo2 dupinfo : this.duplicates) {
-			dupinfo.normalize();
+			dupinfo.processFiles();
 		}
-	}
-
-	public static void reportMemory(String when) {
-		Runtime rt = Runtime.getRuntime();
-		long totmem = rt.totalMemory();
-		long freemem = rt.freeMemory();
-
-		Trace.traceln(Trace.NORMAL, "Memory usage " + when //
-				+ ": " + Utility.formatSize(freemem) + " free of " + Utility.formatSize(totmem));
 	}
 
 	/** Find an existing context with a particular root folder */
@@ -321,13 +278,14 @@ public class Database {
 		return null;
 	}
 
+	/** Locate a context containing a given file */
 	public Context getContextForFile(FileInfo file) {
 		FileInfo origfile = findFile(file);
 
 		return (origfile != null) ? origfile.getContext() : null;
 	}
 
-	/** Find an existing context with a given path to its root folder */
+	/** Find an existing context with a given root folder */
 	private Context findLoadedContext(String folderPath) {
 		File rootfile = new File(folderPath);
 
@@ -340,6 +298,7 @@ public class Database {
 		return null;
 	}
 
+	/** Create and ingest a context given a folder */
 	private Context ingestNewContext(String folderPath, String contextName) {
 		if (!new File(folderPath).isDirectory()) {
 			System.err.println("Error! Context folder '" + folderPath + "' does not exist or is not a directory!");
@@ -356,6 +315,7 @@ public class Database {
 		return context;
 	}
 
+	/** Create a context name */
 	private String getUniqueContextName(String name) {
 		String basename = name;
 
@@ -387,10 +347,7 @@ public class Database {
 		return retname;
 	}
 
-	// =========================================================
-	// File management
-	// =========================================================
-
+	/** Search for a file in all contexts */
 	public FileInfo findFile(FileInfo file) {
 		for (Context context : this.contexts) {
 			FileInfo origfile = context.findFile(file);
@@ -403,16 +360,9 @@ public class Database {
 		return null;
 	}
 
-	// =========================================================
-	// Duplicate analysis
-	// =========================================================
-
+	/** TODO defunct - analyze duplicate info */
 	public void analyzeDuplicates() {
-		analyzeDuplicates(this.contexts);
-	}
-
-	public void analyzeDuplicates(List<Context> contexts) {
-		if (this.model == null) {
+		if (this.modelAvailable) {
 			// Too early during initialization to do this properly
 			return;
 		}
@@ -421,286 +371,11 @@ public class Database {
 		// context.restartAnalysis();
 		// }
 
-		for (Context context : contexts) {
+		for (Context context : this.contexts) {
 			context.analyzeContextDuplicates();
 		}
 
-		Analyzer.analyzeGlobalDuplicates(contexts);
-	}
-
-	void rebuildBrowseTree() {
-		this.view.rebuildBrowseTree();
-	}
-
-	public void registerDuplicateFile(FileInfo fileinfo1, FileInfo fileinfo2) {
-		assert (fileinfo1.getSize() == fileinfo2.getSize()) //
-				&& (fileinfo1.getLastModified() == fileinfo2.getLastModified()) //
-				&& (fileinfo1.getPrefixChecksum(false) == fileinfo2.getPrefixChecksum(false)) //
-				&& (fileinfo1.getSampleChecksum(false) == fileinfo2.getSampleChecksum(false));
-
-		RegisteredDupDiffInfo info1 = findOrCreateDupDiffInfo(fileinfo1);
-		RegisteredDupDiffInfo info2 = findOrCreateDupDiffInfo(fileinfo2);
-
-		info1.updateFrom(fileinfo1);
-		info2.updateFrom(fileinfo2);
-
-		assert (info1.filesize == fileinfo1.getSize()) //
-				&& (info1.timestamp == fileinfo1.getLastModified()) //
-				&& (info1.psum == fileinfo1.getPrefixChecksum(false)) //
-				&& (info1.ssum == fileinfo1.getSampleChecksum(false));
-
-		info1.addDuplicate(fileinfo2);
-		info2.addDuplicate(fileinfo1);
-
-		info1.addDuplicates(info2.duplicateFiles);
-		info2.addDuplicates(info1.duplicateFiles);
-	}
-
-	public void registerDupDiffInfo(RegisteredDupDiffInfo info) {
-		this.registeredDupDiffInfo.put(info.key.getAbsolutePath(), info);
-	}
-
-	public void registerDifferentFile(FileInfo fileinfo1, FileInfo fileinfo2) {
-		assert (fileinfo1.getSize() == fileinfo2.getSize()) //
-				&& (fileinfo1.getLastModified() == fileinfo2.getLastModified()) //
-				&& (fileinfo1.getPrefixChecksum(false) == fileinfo2.getPrefixChecksum(false)) //
-				&& (fileinfo1.getSampleChecksum(false) == fileinfo2.getSampleChecksum(false));
-
-		RegisteredDupDiffInfo info1 = findOrCreateDupDiffInfo(fileinfo1);
-		RegisteredDupDiffInfo info2 = findOrCreateDupDiffInfo(fileinfo2);
-
-		assert (info1.filesize == fileinfo1.getSize()) //
-				&& (info1.timestamp == fileinfo1.getLastModified()) //
-				&& (info1.psum == fileinfo1.getPrefixChecksum(false)) //
-				&& (info1.ssum == fileinfo1.getSampleChecksum(false));
-
-		info1.addDifferent(fileinfo2);
-		info2.addDifferent(fileinfo1);
-	}
-
-	public boolean isRegisteredDuplicateFile(FileInfo file, FileInfo other) {
-		RegisteredDupDiffInfo info = getRegisteredDupDiffInfo(file);
-
-		return (info != null) && info.isDuplicate(other);
-	}
-
-	public boolean isRegisteredDifferentFile(FileInfo file, FileInfo other) {
-		RegisteredDupDiffInfo info = getRegisteredDupDiffInfo(file);
-
-		return (info != null) && info.isDifferent(other);
-	}
-
-	private RegisteredDupDiffInfo findOrCreateDupDiffInfo(FileInfo file) {
-		File jfile = file.getJavaFile();
-
-		RegisteredDupDiffInfo info = this.registeredDupDiffInfo.get(jfile.getAbsolutePath());
-
-		if (info == null) {
-			info = new RegisteredDupDiffInfo(file);
-			this.registeredDupDiffInfo.put(jfile.getAbsolutePath(), info);
-		} else {
-			info.syncFileChecksums(file);
-		}
-
-		return info;
-	}
-
-	private static Collection<DupDiffFileInfo> NoFiles = new ArrayList<DupDiffFileInfo>();
-
-	public Collection<DupDiffFileInfo> getRegisteredDuplicates(File file) {
-		RegisteredDupDiffInfo info = this.registeredDupDiffInfo.get(file.getAbsolutePath());
-
-		return (info != null) ? info.duplicateFiles : NoFiles;
-	}
-
-	public Collection<DupDiffFileInfo> getRegisteredDifferentFiles(File file) {
-		RegisteredDupDiffInfo info = this.registeredDupDiffInfo.get(file.getAbsolutePath());
-
-		return (info != null) ? info.differentFiles : NoFiles;
-	}
-
-	public boolean isDirty() {
-		return this.dirty;
-	}
-
-	public void setDirty(boolean yesno) {
-		this.dirty = yesno;
-	}
-
-	public Map<String, RegisteredDupDiffInfo> getRegisteredDupDiffInfo() {
-		return this.registeredDupDiffInfo;
-	}
-
-	private RegisteredDupDiffInfo getRegisteredDupDiffInfo(FileInfo file) {
-		File jfile = file.getJavaFile();
-		RegisteredDupDiffInfo info = getRegisteredDupDiffInfo(jfile);
-
-		// TODO compare file attributes more carefully here
-		if (info != null) {
-			if ((jfile.length() == info.filesize) //
-					&& (jfile.lastModified() == info.timestamp)) {
-				file.setPrefixChecksum(info.psum);
-				file.setSampleChecksum(info.ssum);
-			}
-		}
-
-		return info;
-	}
-
-	private RegisteredDupDiffInfo getRegisteredDupDiffInfo(File file) {
-		return getRegisteredDupDiffInfo(file.getAbsolutePath());
-	}
-
-	public RegisteredDupDiffInfo getRegisteredDupDiffInfo(String filename) {
-		return this.registeredDupDiffInfo.get(filename);
-	}
-
-	public static class DupDiffFileInfo {
-		public String filename;
-		// public long size;
-		public long timestamp;
-
-		public DupDiffFileInfo(String filename, long timestamp) {
-			this.filename = filename;
-			// this.size = ;
-			this.timestamp = timestamp;
-		}
-
-		public DupDiffFileInfo(File file) {
-			this.filename = file.getAbsolutePath();
-			// this.size = file.length();
-			this.timestamp = file.lastModified();
-		}
-
-		public boolean matches(FileInfo file) {
-			File jfile = file.getJavaFile();
-
-			if (!this.filename.equals(jfile.getAbsolutePath())) {
-				return false;
-			}
-
-			return this.timestamp == jfile.lastModified();
-		}
-
-		public int hashCode() {
-			return this.filename.hashCode();
-		}
-
-		public boolean equals(Object o) {
-			if (this == o) {
-				return true;
-			}
-
-			return (o instanceof DupDiffFileInfo) ? this.filename.equals(((DupDiffFileInfo) o).filename)
-					: super.equals(o);
-		}
-	}
-
-	public static class RegisteredDupDiffInfo {
-		File key;
-		long filesize;
-		long timestamp;
-		int psum;
-		int ssum;
-
-		Collection<DupDiffFileInfo> duplicateFiles;
-		Collection<DupDiffFileInfo> differentFiles;
-
-		public RegisteredDupDiffInfo(File key, long size, long timestamp, int psum, int ssum) {
-			this.key = key;
-
-			this.filesize = size;
-			this.timestamp = timestamp;
-
-			this.psum = psum;
-			this.ssum = ssum;
-
-			this.duplicateFiles = new ArrayList<DupDiffFileInfo>();
-			this.differentFiles = new ArrayList<DupDiffFileInfo>();
-		}
-
-		public RegisteredDupDiffInfo(FileInfo file) {
-			this(file.getJavaFile(), //
-					file.getSize(), //
-					file.getLastModified(), //
-					file.getPrefixChecksum(false), //
-					file.getSampleChecksum(false));
-		}
-
-		public void updateFrom(FileInfo file) {
-			if (this.psum == 0) {
-				this.psum = file.getPrefixChecksum(false);
-			}
-
-			if (this.ssum == 0) {
-				this.ssum = file.getSampleChecksum(false);
-			}
-		}
-
-		public boolean isDuplicate(FileInfo file) {
-			if (!matchesFile(file)) {
-				return false;
-			}
-
-			for (DupDiffFileInfo info : this.duplicateFiles) {
-				if (info.matches(file)) {
-					syncFileChecksums(file);
-
-					return true;
-				}
-			}
-
-			return false;
-		}
-
-		private boolean matchesFile(FileInfo file) {
-			int psum = file.getPrefixChecksum(false);
-			int ssum = file.getSampleChecksum(false);
-
-			return ((psum == 0) || (this.psum == psum)) //
-					&& ((ssum == 0) || (this.ssum == ssum));
-		}
-
-		private void syncFileChecksums(FileInfo file) {
-			file.setPrefixChecksum(this.psum);
-			file.setSampleChecksum(this.ssum);
-		}
-
-		public boolean isDifferent(FileInfo file) {
-			for (DupDiffFileInfo info : this.differentFiles) {
-				if (info.matches(file)) {
-					return true;
-				}
-			}
-
-			return false;
-		}
-
-		public void addDifferent(FileInfo file) {
-			addDifferent(new DupDiffFileInfo(file.getJavaFile()));
-		}
-
-		public void addDifferent(DupDiffFileInfo file) {
-			if (!this.differentFiles.contains(file)) {
-				this.differentFiles.add(file);
-			}
-		}
-
-		public void addDuplicate(FileInfo file) {
-			addDuplicate(new DupDiffFileInfo(file.getJavaFile()));
-		}
-
-		public void addDuplicate(DupDiffFileInfo file) {
-			if (!this.duplicateFiles.contains(file)) {
-				this.duplicateFiles.add(file);
-			}
-		}
-
-		public void addDuplicates(Collection<DupDiffFileInfo> files) {
-			for (DupDiffFileInfo file : files) {
-				addDuplicate(file);
-			}
-		}
+		Analyzer.analyzeGlobalDuplicates(this.contexts);
 	}
 
 	// private ContextMonitor contextMonitor;

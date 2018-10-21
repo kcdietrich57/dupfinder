@@ -57,8 +57,6 @@ public class DupBrowserApp {
 		Controller controller = new Controller();
 		View view = new View(controller);
 
-		db.setView(view);
-
 		c.add(view.getToolBar(), BorderLayout.PAGE_START);
 		c.add(view.getUIContainer());
 		c.add(view.getStatusBar(), BorderLayout.SOUTH);

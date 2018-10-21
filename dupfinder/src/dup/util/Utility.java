@@ -1,7 +1,6 @@
 package dup.util;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 
@@ -12,25 +11,6 @@ import dup.model.FolderInfo;
 /** General utility functions */
 public final class Utility {
 	private static final long K = 1024;
-
-	public static boolean checksumsAreIdentical(int cksum1, int cksum2) {
-		return ((cksum1 != 0) && (cksum2 != 0) //
-				&& (cksum1 == cksum2));
-	}
-
-	public static boolean bytesAreIdentical(byte[] bytes1, byte[] bytes2) {
-		return ((bytes1 != null) && (bytes2 != null) //
-				&& Arrays.equals(bytes1, bytes2));
-	}
-
-	public static boolean checksumsAreCompatible(int cksum1, int cksum2) {
-		return (cksum1 == 0) || (cksum2 == 0) || (cksum1 == cksum2);
-	}
-
-	public static boolean bytesAreCompatible(byte[] bytes1, byte[] bytes2) {
-		return (bytes1 == null) || (bytes2 == null) //
-				|| Arrays.equals(bytes1, bytes2);
-	}
 
 	public static String formatPercent(float ratio) {
 		return String.format("%5.2f", (ratio * 100.0)).trim();
@@ -86,6 +66,15 @@ public final class Utility {
 		}
 
 		return files;
+	}
+
+	public static void reportMemory(String when) {
+		Runtime rt = Runtime.getRuntime();
+		long totmem = rt.totalMemory();
+		long freemem = rt.freeMemory();
+
+		Trace.traceln(Trace.NORMAL, "Memory usage " + when //
+				+ ": " + Utility.formatSize(freemem) + " free of " + Utility.formatSize(totmem));
 	}
 
 	// TODO this should return some representation of the delta. For now it just

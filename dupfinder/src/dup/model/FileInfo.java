@@ -11,7 +11,6 @@ import dup.analyze.DetailLevel;
 import dup.analyze.DuplicateInfo;
 import dup.analyze.DuplicateInfo2;
 import dup.analyze.Fingerprint;
-import dup.util.Utility;
 
 /** Class representing a file object */
 public class FileInfo extends FileObjectInfo {
@@ -49,10 +48,6 @@ public class FileInfo extends FileObjectInfo {
 		this.dupinfo = file.dupinfo;
 	}
 
-	public ChecksumValues getChecksums() {
-		return this.checksums;
-	}
-
 	/**
 	 * Is this file a duplicate of a file in a possibly different context? This will
 	 * optionally compare file contents.
@@ -62,28 +57,29 @@ public class FileInfo extends FileObjectInfo {
 	 * @return True if the files are duplicates by our best information
 	 */
 	public boolean isDuplicateOf(FileInfo other, boolean compareFiles) {
-		if (this.dupinfo.getVerifiedDifferentFiles().contains(other)) {
-			return false;
-		}
-
-		if ((this.dupinfo.getVerifiedDuplicates() != null) //
-				&& this.dupinfo.getVerifiedDuplicates().contains(other)) {
-			return true;
-		}
-
-		if (Database.instance().isRegisteredDifferentFile(this, other)) {
-			this.dupinfo.addToVerifiedDifferent(other.getDupinfo());
-			return false;
-		}
-
-		if (Database.instance().isRegisteredDuplicateFile(this, other)) {
-			this.dupinfo.addToVerifiedDuplicate(other.getDupinfo());
-			return true;
-		}
+//		if (this.dupinfo.getVerifiedDifferentFiles().contains(other)) {
+//			return false;
+//		}
+//
+//		if ((this.dupinfo.getVerifiedDuplicates() != null) //
+//				&& this.dupinfo.getVerifiedDuplicates().contains(other)) {
+//			return true;
+//		}
+//
+//		if (RegisteredDupDiffInfo.isRegisteredDifferentFile(this, other)) {
+//			this.dupinfo.addToVerifiedDifferent(other.getDupinfo());
+//			return false;
+//		}
+//
+//		if (RegisteredDupDiffInfo.isRegisteredDuplicateFile(this, other)) {
+//			this.dupinfo.addToVerifiedDuplicate(other.getDupinfo());
+//			return true;
+//		}
 
 		if (!checksumsMatch(other) //
 				// TODO I believe we have already checked this above
-				|| !this.dupinfo.isVerifiedEqual(other.getDupinfo())) {
+//				|| !this.dupinfo.isVerifiedEqual(other.getDupinfo())
+				) {
 			return false;
 		}
 
@@ -93,15 +89,16 @@ public class FileInfo extends FileObjectInfo {
 	}
 
 	public boolean checksumsMatch(FileInfo other) {
-		if (isIgnoredFile(this) || isIgnoredFile(other)) {
+		if (isIgnoredFile() || other.isIgnoredFile()) {
 			return false;
 		}
 
-		if ((this.getSize() != other.getSize()) //
-				|| !Utility.checksumsAreCompatible(this.getPrefixChecksum(true), other.getPrefixChecksum(true)) //
-				|| !Utility.bytesAreCompatible(this.getSampleBytes(true), other.getSampleBytes(true)) //
-				|| !Utility.checksumsAreCompatible(this.getSampleChecksum(true), other.getSampleChecksum(true)) //
-		// TODO || !Utility.checksumsMatch(this.getFullChecksum(context),
+		assert (getSize() == other.getSize());
+
+		if (!ChecksumValues.isIdentical(this.getPrefixChecksum(true), other.getPrefixChecksum(true)) //
+				|| !ChecksumValues.isIdentical(this.getSampleBytes(true), other.getSampleBytes(true)) //
+				|| !ChecksumValues.isIdentical(this.getSampleChecksum(true), other.getSampleChecksum(true)) //
+		// TODO || !ChecksumValues.isIdentical(this.getFullChecksum(context),
 		// other.getFullChecksum(otherContext))
 		) {
 			return false;
@@ -111,11 +108,11 @@ public class FileInfo extends FileObjectInfo {
 						// other.getDupinfo());
 	}
 
-	private boolean isIgnoredFile(FileInfo finfo) {
-		if (finfo.getSize() == 0) {
+	private boolean isIgnoredFile() {
+		if (getSize() == 0) {
 			return true;
 		}
-		if (finfo.getName().equals(".DS_Store")) {
+		if (getName().equals(".DS_Store")) {
 			return true;
 		}
 

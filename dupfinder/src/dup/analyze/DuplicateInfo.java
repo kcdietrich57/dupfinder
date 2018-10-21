@@ -241,10 +241,10 @@ public class DuplicateInfo {
 
 		if (same) {
 			addToVerifiedDuplicate(other);
-			Database.instance().registerDuplicateFile(this.file, other.file);
+			RegisteredDupDiffInfo.registerDuplicateFile(this.file, other.file);
 		} else {
 			addToVerifiedDifferent(other);
-			Database.instance().registerDifferentFile(this.file, other.file);
+			RegisteredDupDiffInfo.registerDifferentFile(this.file, other.file);
 		}
 
 		return same;

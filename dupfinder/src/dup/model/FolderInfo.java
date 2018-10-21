@@ -26,6 +26,10 @@ public class FolderInfo extends FileObjectInfo {
 	public FolderInfo(FolderInfo folder, String name) {
 		super(folder, name);
 	}
+	
+	public FolderInfo(Context context, File file) {
+		super(context.id, file);
+	}
 
 	public void addFolder(FolderInfo folder) {
 		assert (folder != null) && (folder.getFolder() == this);

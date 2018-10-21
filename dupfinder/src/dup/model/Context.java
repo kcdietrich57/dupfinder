@@ -27,7 +27,7 @@ public class Context implements Comparable<Context> {
 
 	private static int nextid = 1;
 
-	private int id;
+	public final int id;
 
 	/** TODO Context name (currently folder) */
 	private String name;
@@ -119,7 +119,7 @@ public class Context implements Comparable<Context> {
 		this.dirty = false;
 		this.detailLevel = other.detailLevel;
 		this.rootFolderFile = other.rootFolderFile;
-		this.rootFolder = new FolderInfo(null, this.rootFolderFile);
+		this.rootFolder = new FolderInfo(this, this.rootFolderFile);
 	}
 
 	public int compareTo(Context other) {
@@ -210,7 +210,7 @@ public class Context implements Comparable<Context> {
 	/** Locate the root folder for this context */
 	public FolderInfo getRoot() {
 		if (this.rootFolder == null) {
-			this.rootFolder = new FolderInfo(null, this.rootFolderFile);
+			this.rootFolder = new FolderInfo(this, this.rootFolderFile);
 		}
 
 		return this.rootFolder;

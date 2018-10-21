@@ -14,12 +14,13 @@ import java.util.Set;
 import javax.swing.JToolBar;
 
 import dup.analyze.DetailLevel;
+import dup.analyze.DupDiffFileInfo;
+import dup.analyze.RegisteredDupDiffInfo;
 import dup.model.Context;
 import dup.model.Database;
 import dup.model.FileInfo;
 import dup.model.FileObjectInfo;
 import dup.model.FolderInfo;
-import dup.model.Database.DupDiffFileInfo;
 import dup.util.Trace;
 
 public class View {
@@ -32,7 +33,8 @@ public class View {
 	}
 
 	void setDatabaseModel() {
-		Database.instance().setModel(this.controller.browserTreeModel);
+		Database.instance().setModelAvailable(true);
+		// setModel(this.controller.browserTreeModel);
 	}
 
 	void setBrowserTreeModel(FolderTreeModel model) {
@@ -205,14 +207,14 @@ public class View {
 		Trace.traceln();
 		Trace.traceln(Trace.NORMAL, "Registered Duplicates (DB)");
 
-		for (DupDiffFileInfo f : Database.instance().getRegisteredDuplicates(jfile)) {
+		for (DupDiffFileInfo f : RegisteredDupDiffInfo.getRegisteredDuplicates(jfile)) {
 			Trace.traceln(Trace.NORMAL, " " + f.filename);
 		}
 
 		Trace.traceln();
 		Trace.traceln(Trace.NORMAL, "Registered Differences (DB)");
 
-		for (DupDiffFileInfo f : Database.instance().getRegisteredDifferentFiles(jfile)) {
+		for (DupDiffFileInfo f : RegisteredDupDiffInfo.getRegisteredDifferentFiles(jfile)) {
 			Trace.traceln(Trace.NORMAL, " " + f.filename);
 		}
 	}

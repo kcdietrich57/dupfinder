@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import dup.model.Context;
-import dup.model.Database;
 import dup.model.FileInfo;
 import dup.util.Trace;
 
@@ -77,7 +76,7 @@ public class BatchDetailsUpdate {
 		Trace.traceln(Trace.VERBOSE, //
 				"BatchDetailsUpdate: Processed of " + this.filecount + " files.");
 
-		Database.instance().getModel().structureChanged();
+		// TODO Database.instance().getModel().structureChanged();
 	}
 
 	public int size() {
