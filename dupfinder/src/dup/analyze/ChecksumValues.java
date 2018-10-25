@@ -5,6 +5,7 @@ import java.util.Arrays;
 /** Holds checksum values for a file */
 public class ChecksumValues implements Comparable<ChecksumValues> {
 	public static final int CKSUM_UNDEFINED = 0;
+	public static final int PREFIX_LENGTH=1024;
 
 	private static boolean sumsAreEqual(int sum1, int sum2) {
 		return compareSums(sum1, sum2) == 0;
@@ -56,15 +57,11 @@ public class ChecksumValues implements Comparable<ChecksumValues> {
 	}
 
 	public DetailLevel getDetailLevel() {
-		if (this.sampleBytes != null) {
-			return DetailLevel.Sample;
-		}
-
 		if (this.sample != CKSUM_UNDEFINED) {
 			return DetailLevel.Sample;
 		}
 
-		if (this.prefix != CKSUM_UNDEFINED) {
+		if ((this.sampleBytes != null) && (this.prefix != CKSUM_UNDEFINED)) {
 			return DetailLevel.Prefix;
 		}
 

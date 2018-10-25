@@ -5,22 +5,15 @@ import java.awt.Container;
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
-import java.util.Set;
 
 import javax.swing.JToolBar;
 
 import dup.analyze.DetailLevel;
-import dup.analyze.DupDiffFileInfo;
-import dup.analyze.RegisteredDupDiffInfo;
 import dup.model.Context;
 import dup.model.Database;
 import dup.model.FileInfo;
-import dup.model.FileObjectInfo;
-import dup.model.FolderInfo;
+import dup.util.Dumper;
 import dup.util.Trace;
 
 public class View {
@@ -90,7 +83,7 @@ public class View {
 
 		this.browseTreeSelection = this.widgets.getSelectedBrowseTreeNodes();
 
-		dumpSelectionDuplicateInfo();
+		Dumper.dumpSelectionDuplicateInfo(this.browseTreeSelection);
 
 		try {
 			this.dupTreeSelection = null;
@@ -111,124 +104,6 @@ public class View {
 		}
 
 		this.widgets.updateToolbarEnablement(this.browseTreeSelection);
-	}
-
-	private void dumpSelectionDuplicateInfo() {
-		if (this.browseTreeSelection.length == 0) {
-			return;
-		}
-
-		Object selobj = this.browseTreeSelection[0];
-
-		List<FileInfo> globalDups = new ArrayList<FileInfo>();
-		List<FileInfo> contextDups = new ArrayList<FileInfo>();
-		List<FileInfo> bothDups = new ArrayList<FileInfo>();
-
-		if (selobj instanceof Context) {
-			selobj = ((Context) selobj).getRoot();
-		}
-
-		if (selobj instanceof FileObjectInfo) {
-			FileObjectInfo fileobj = (FileObjectInfo) selobj;
-
-			if (fileobj instanceof FolderInfo) {
-				bothDups = ((FolderInfo) fileobj).getDuplicateFiles(true);
-			} else if (fileobj instanceof FileInfo) {
-				FileInfo fileinfo = (FileInfo) fileobj;
-
-				Set<FileInfo> set = new HashSet<FileInfo>();
-				set.addAll(fileinfo.getContextDuplicates());
-				set.addAll(fileinfo.getGlobalDuplicates());
-				bothDups.addAll(set);
-			}
-		}
-
-		for (Iterator<FileInfo> iter = bothDups.iterator(); iter.hasNext();) {
-			FileInfo file = iter.next();
-
-			if (file.hasGlobalDuplicates()) {
-				if (!file.hasContextDuplicates()) {
-					globalDups.add(file);
-					iter.remove();
-				}
-			} else if (file.hasContextDuplicates()) {
-				contextDups.add(file);
-				iter.remove();
-			}
-		}
-
-		if (selobj instanceof FileInfo) {
-		} else {
-			String selname = (selobj instanceof Database) ? "database" : "";
-			Trace.traceln(Trace.NORMAL,
-					"Duplicates in " + selname + " global: " + globalDups.size() + " context: " + contextDups.size());
-
-			return;
-		}
-
-		FileInfo file = (FileInfo) selobj;
-
-		Trace.traceln(Trace.NORMAL, "Duplicates for file " + file.getName());
-
-		for (FileInfo f : contextDups) {
-			if (f != file) {
-				dumpFile(f, " C");
-			}
-		}
-
-		for (FileInfo f : bothDups) {
-			if (f != file) {
-				dumpFile(f, "GC");
-			}
-		}
-
-		for (FileInfo f : globalDups) {
-			if (f != file) {
-				dumpFile(f, "G ");
-			}
-		}
-
-		Trace.traceln();
-		Trace.traceln(Trace.NORMAL, "Verified Duplicates (file)");
-
-		for (FileInfo f : file.getDupinfo().getVerifiedDuplicates()) {
-			Trace.traceln(Trace.NORMAL, " " + f.getFullName());
-		}
-
-		Trace.traceln();
-		Trace.traceln(Trace.NORMAL, "Verified Differences (file)");
-
-		for (FileInfo f : file.getDupinfo().getVerifiedDifferentFiles()) {
-			Trace.traceln(Trace.NORMAL, " " + f.getFullName());
-		}
-
-		File jfile = file.getJavaFile();
-
-		Trace.traceln();
-		Trace.traceln(Trace.NORMAL, "Registered Duplicates (DB)");
-
-		for (DupDiffFileInfo f : RegisteredDupDiffInfo.getRegisteredDuplicates(jfile)) {
-			Trace.traceln(Trace.NORMAL, " " + f.filename);
-		}
-
-		Trace.traceln();
-		Trace.traceln(Trace.NORMAL, "Registered Differences (DB)");
-
-		for (DupDiffFileInfo f : RegisteredDupDiffInfo.getRegisteredDifferentFiles(jfile)) {
-			Trace.traceln(Trace.NORMAL, " " + f.filename);
-		}
-	}
-
-	private void dumpFile(FileInfo f, String s) {
-		int level = Trace.NORMAL;
-		String contextname = (f.getContext() != null) ? f.getContext().getName() : "NO_CONTEXT";
-
-		Trace.trace(level, s + "  Sz: " + f.getSize());
-		Trace.trace(level, " Ps: " + f.getPrefixChecksum());
-		Trace.trace(level, " Ss: " + f.getSampleChecksum());
-		Trace.trace(level, "  " + contextname);
-		Trace.trace(level, " " + f.getName());
-		Trace.traceln(level);
 	}
 
 	void openContext() {

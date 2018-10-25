@@ -232,7 +232,7 @@ public abstract class Checksum {
 				}
 
 				if (ii == 0) {
-					int sampleSize = Math.min(numRead, 512);
+					int sampleSize = Math.min(numRead, ChecksumValues.PREFIX_LENGTH);
 					finfo.setSampleBytes(buffer, sampleSize);
 				}
 

@@ -9,6 +9,7 @@ import java.util.List;
 
 import dup.analyze.Analyzer;
 import dup.analyze.Checksum;
+import dup.analyze.DetailLevel;
 import dup.analyze.DupDiffFileInfo;
 import dup.analyze.DuplicateInfo2;
 import dup.model.persist.ContextLoader;
@@ -38,7 +39,7 @@ public class Database {
 
 	private List<Context> contexts = new ArrayList<Context>();
 	private List<FileInfo> files = new ArrayList<FileInfo>();
-	private List<DuplicateInfo2> duplicates = new ArrayList<DuplicateInfo2>();
+	public final List<DuplicateInfo2> duplicates = new ArrayList<DuplicateInfo2>();
 
 	/** TODO Flags whether the file model is initialized yet */
 	private boolean modelAvailable = false;
@@ -133,34 +134,23 @@ public class Database {
 		}
 
 		if (isdup) {
-			addFileToDuplicates(file);
-		}
-	}
-
-	/** Dummy dupinfo for searching by file size */
-	private static class DummyDupInfo extends DuplicateInfo2 {
-		public long size = 0;
-
-		public DummyDupInfo(long size) {
-			this.size = size;
-		}
-
-		public long fileSize() {
-			return this.size;
+			addFileToDuplicates(idx, file);
 		}
 	}
 
 	/** Add file to existing duplicate info database */
-	private void addFileToDuplicates(FileInfo file) {
-		DuplicateInfo2 dupinfo = getDupinfo(file.getSize());
+	private void addFileToDuplicates(int idx, FileInfo file) {
+		DuplicateInfo2 dupinfo = getDupinfo(idx, file.getSize());
 
 		dupinfo.addFile(file);
 	}
 
-	/** Get the duplicate info for a given file size */
-	private DuplicateInfo2 getDupinfo(long size) {
-		int idx = Collections.binarySearch(this.duplicates, //
-				new DummyDupInfo(size), //
+	/** Get or create duplicate info for a given file size */
+	private DuplicateInfo2 getDupinfo(int fileidx, long size) {
+		DuplicateInfo2 dupinfo = new DuplicateInfo2(size);
+
+		int dupidx = Collections.binarySearch(this.duplicates, //
+				dupinfo, //
 				new Comparator<DuplicateInfo2>() {
 					public int compare(DuplicateInfo2 d1, DuplicateInfo2 d2) {
 						long diff = d1.fileSize() - d2.fileSize();
@@ -174,12 +164,29 @@ public class Database {
 					}
 				});
 
-		if (idx >= 0) {
-			return this.duplicates.get(idx);
-		}
+		if (dupidx >= 0) {
+			dupinfo = this.duplicates.get(dupidx);
+		} else {
+			this.duplicates.add(-dupidx - 1, dupinfo);
 
-		DuplicateInfo2 dupinfo = new DuplicateInfo2();
-		this.duplicates.add(-idx - 1, dupinfo);
+			for (int idx = fileidx - 1; idx > 0; --idx) {
+				FileInfo file = this.files.get(idx);
+				if (file.getSize() != size) {
+					break;
+				}
+
+				dupinfo.addFile(file);
+			}
+
+			for (int idx = fileidx + 1; idx < this.files.size(); ++idx) {
+				FileInfo file = this.files.get(idx);
+				if (file.getSize() != size) {
+					break;
+				}
+
+				dupinfo.addFile(file);
+			}
+		}
 
 		return dupinfo;
 	}
@@ -216,7 +223,13 @@ public class Database {
 
 		this.contexts.add(context);
 
-		processFiles();
+		Trace.traceln(Trace.NORMAL, "Processing ingested files");
+		processFiles(DetailLevel.Size);
+		summarizeDuplicates();
+		processFiles(DetailLevel.Prefix);
+		summarizeDuplicates();
+		processFiles(DetailLevel.Sample);
+		summarizeDuplicates();
 
 		// TODO the following analysis methods are defunct
 		context.analyzeContextDuplicates();
@@ -239,11 +252,48 @@ public class Database {
 		return context;
 	}
 
-	/** Perform analysis on each group of same-size files */
-	private void processFiles() {
+	private void summarizeDuplicates() {
+		int numchains = 0;
+		int numfiles = 0;
+		int longchain = 0;
+
 		for (DuplicateInfo2 dupinfo : this.duplicates) {
-			dupinfo.processFiles();
+			for (List<FileInfo> dups : dupinfo.getDuplicateLists()) {
+				++numchains;
+				numfiles += dups.size();
+				if (dups.size() > longchain) {
+					longchain = dups.size();
+				}
+			}
 		}
+
+		Trace.traceln(Trace.NORMAL, String.format(//
+				"%d files in %d chains (long %d)", numfiles, numchains, longchain));
+	}
+
+	/** Perform analysis on each group of same-size files */
+	private void processFiles(DetailLevel level) {
+		int nn = this.duplicates.size();
+
+		Trace.traceln(Trace.NORMAL, String.format( //
+				"Processing chains %d detail %s", //
+				nn, level.toString()));
+
+		for (int ii = 0; ii < nn; ++ii) {
+			DuplicateInfo2 dupinfo = this.duplicates.get(ii);
+
+			if ((nn < 100) || ((ii % (nn / 100)) == 0)) {
+				Trace.trace(Trace.NORMAL, ".");
+//				Trace.trace(Trace.NORMAL, String.format( //
+//						"  %s", Utility.formatSize(dupinfo.fileSize())));
+			} else {
+				//Trace.trace(Trace.NORMAL, ".");
+			}
+
+			dupinfo.processFiles(level);
+		}
+
+		Trace.traceln(Trace.NORMAL);
 	}
 
 	/** Find an existing context with a particular root folder */

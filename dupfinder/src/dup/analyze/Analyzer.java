@@ -6,6 +6,7 @@ import java.util.Iterator;
 import java.util.List;
 
 import dup.model.Context;
+import dup.model.Database;
 import dup.model.FileInfo;
 import dup.model.FolderInfo;
 import dup.util.Trace;
@@ -47,18 +48,10 @@ public final class Analyzer {
 
 		gatherContextFiles();
 
-		for (;;) {
-			if (!determineNextSize()) {
-				break;
-			}
+		for (DuplicateInfo2 dupinfo : Database.instance().duplicates) {
+			traceProgress(dupinfo);
 
-			traceProgress();
-
-			List<FileInfo> samesize = getSameSizeList();
-
-			while (samesize.size() > 1) {
-				List<FileInfo> dupfiles = getDuplicates(samesize);
-
+			for (List<FileInfo> dupfiles : dupinfo.getDuplicateLists()) {
 				if (hasGlobalDuplicates(dupfiles)) {
 					for (FileInfo dfile : dupfiles) {
 						dfile.setGlobalDuplicates(dupfiles);
@@ -76,6 +69,7 @@ public final class Analyzer {
 
 		FolderInfo firstroot = null;
 
+		// TODO check context id instead
 		for (FileInfo file : dupfiles) {
 			if (firstroot == null) {
 				firstroot = file.getRootFolder();
@@ -164,14 +158,10 @@ public final class Analyzer {
 	}
 
 	/** Trace progress of analysis */
-	private void traceProgress() {
+	private void traceProgress(DuplicateInfo2 dupinfo) {
 		if (System.currentTimeMillis() >= this.deadline) {
 			this.deadline += 1000;
-
-			int remaining = countRemainingFiles();
-
-			Trace.traceln(Trace.NORMAL, " Size=" + this.curFileSize //
-					+ " " + remaining + " files of " + this.totalFileCount + " remaining");
+			Trace.traceln(Trace.NORMAL, "Processing " + dupinfo.toString());
 		}
 	}
 

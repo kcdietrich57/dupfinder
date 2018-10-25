@@ -1,6 +1,7 @@
 package dup.analyze;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -11,7 +12,7 @@ import dup.model.Context;
 import dup.model.FileInfo;
 
 public class DuplicateInfo2 {
-	private long filesize = -1;
+	private final long filesize;
 
 	/** All files in this group (same size), sorted by checksum info */
 	private List<FileInfo> sameSizeFiles;
@@ -19,13 +20,18 @@ public class DuplicateInfo2 {
 	/** Sub-groups of files with identical checksum info, sorted by context */
 	private Map<ChecksumValues, List<FileInfo>> duplicateFiles;
 
-	public DuplicateInfo2() {
+	public DuplicateInfo2(long size) {
+		this.filesize = size;
 		this.sameSizeFiles = new ArrayList<FileInfo>();
 		this.duplicateFiles = new HashMap<ChecksumValues, List<FileInfo>>();
 	}
 
 	public long fileSize() {
 		return this.filesize;
+	}
+
+	public Collection<List<FileInfo>> getDuplicateLists() {
+		return this.duplicateFiles.values();
 	}
 
 	/**
@@ -37,8 +43,9 @@ public class DuplicateInfo2 {
 	 * of the group if necessary and update the duplicate lists.
 	 */
 	public void addFile(FileInfo file) {
+		assert this.filesize == file.getSize();
+
 		this.sameSizeFiles.add(file);
-		this.filesize = file.getSize();
 		file.dupinfo2 = this;
 
 //		Collections.sort(this.sameSizeFiles, new Comparator<FileInfo>() {
@@ -169,8 +176,10 @@ public class DuplicateInfo2 {
 		return false;
 	}
 
-	public void processFiles() {
-		//sortFilesByChecksums();
+	public void processFiles(DetailLevel level) {
+		// sortFilesByChecksums();
+
+		this.duplicateFiles.clear();
 
 		for (int idx = 0; idx < this.sameSizeFiles.size(); ++idx) {
 			FileInfo file = this.sameSizeFiles.get(idx);
@@ -178,7 +187,7 @@ public class DuplicateInfo2 {
 			for (int otheridx = idx + 1; otheridx < this.sameSizeFiles.size(); ++otheridx) {
 				FileInfo otherfile = this.sameSizeFiles.get(otheridx);
 
-				if (file.isDuplicateOf(otherfile, true)) {
+				if (file.isDuplicateOf(otherfile, level)) {
 					List<FileInfo> dups = this.duplicateFiles.get(file.checksums);
 
 					if (dups == null) {
@@ -194,15 +203,15 @@ public class DuplicateInfo2 {
 				}
 			}
 		}
-		
-		//sortFilesByChecksums();
+
+		// sortFilesByChecksums();
 	}
 
 	public String toString() {
 		StringBuffer sb = new StringBuffer();
 
 		sb.append(String.format("DuplicateInfo: sz=%d files=%d chains=%d", //
-				this.sameSizeFiles.get(0).getSize(), //
+				this.filesize, //
 				this.sameSizeFiles.size(), //
 				this.duplicateFiles.size()));
 

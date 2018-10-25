@@ -57,6 +57,18 @@ public class FileInfo extends FileObjectInfo {
 	 * @return True if the files are duplicates by our best information
 	 */
 	public boolean isDuplicateOf(FileInfo other, boolean compareFiles) {
+		return isDuplicateOf(other, DetailLevel.Sample);
+	}
+
+	/**
+	 * Is this file a duplicate of a file in a possibly different context? This will
+	 * optionally compare file contents.
+	 * 
+	 * @param other The other file
+	 * @param level What level of comparison to perform
+	 * @return True if the files are duplicates by our best information
+	 */
+	public boolean isDuplicateOf(FileInfo other, DetailLevel level) {
 //		if (this.dupinfo.getVerifiedDifferentFiles().contains(other)) {
 //			return false;
 //		}
@@ -76,33 +88,49 @@ public class FileInfo extends FileObjectInfo {
 //			return true;
 //		}
 
-		if (!checksumsMatch(other) //
-				// TODO I believe we have already checked this above
+		if (!checksumsMatch(other, level) //
+		// TODO I believe we have already checked this above
 //				|| !this.dupinfo.isVerifiedEqual(other.getDupinfo())
-				) {
+		) {
 			return false;
 		}
 
-		compareFiles = false;
+		boolean compareFiles = false;
 		return !compareFiles //
 				|| Fingerprint.filesAreIdentical(this, other);
 	}
 
 	public boolean checksumsMatch(FileInfo other) {
+		return checksumsMatch(other, DetailLevel.Sample);
+	}
+
+	public boolean checksumsMatch(FileInfo other, DetailLevel level) {
 		if (isIgnoredFile() || other.isIgnoredFile()) {
 			return false;
 		}
 
 		assert (getSize() == other.getSize());
-
-		if (!ChecksumValues.isIdentical(this.getPrefixChecksum(true), other.getPrefixChecksum(true)) //
-				|| !ChecksumValues.isIdentical(this.getSampleBytes(true), other.getSampleBytes(true)) //
-				|| !ChecksumValues.isIdentical(this.getSampleChecksum(true), other.getSampleChecksum(true)) //
-		// TODO || !ChecksumValues.isIdentical(this.getFullChecksum(context),
-		// other.getFullChecksum(otherContext))
-		) {
-			return false;
+		if (!level.isGreaterThan(DetailLevel.Size)) {
+			return true;
 		}
+
+		if (!level.isLessThan(DetailLevel.Prefix)) {
+			if (!ChecksumValues.isIdentical(this.getPrefixChecksum(true), other.getPrefixChecksum(true))) {
+				return false;
+			}
+		}
+
+		if (!level.isLessThan(DetailLevel.Sample)) {
+			if (!ChecksumValues.isIdentical(this.getSampleBytes(true), other.getSampleBytes(true)) //
+					|| ChecksumValues.isIdentical(this.getSampleChecksum(true), other.getSampleChecksum(true))) {
+				return false;
+			}
+		}
+
+		// TODO if (ChecksumValues.isIdentical(this.getFullChecksum(context),
+		// other.getFullChecksum(otherContext))) {
+		// return true;
+		// }
 
 		return true; // isVerifiedEqual(context, otherContext,
 						// other.getDupinfo());
@@ -190,7 +218,7 @@ public class FileInfo extends FileObjectInfo {
 
 	public String toString() {
 		String ctxname = (getContext() != null) ? getContext().getName() : "N/A";
-		return String.format("File[%s] cx=%s sz=%d det=%s %s", //
+		return String.format("File[%s] cx='%s' sz=%d det=%s %s", //
 				getName(), ctxname, getSize(), //
 				getDetailLevel().toString(), //
 				this.checksums.toString());
