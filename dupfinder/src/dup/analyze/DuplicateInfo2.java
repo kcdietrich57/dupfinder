@@ -30,6 +30,25 @@ public class DuplicateInfo2 {
 		return this.filesize;
 	}
 
+	/** Get the files that are AFAIK identical to a given file */
+	public List<FileInfo> getDuplicates(FileInfo file) {
+		List<FileInfo> dups = this.duplicateFiles.get(file.checksums);
+		return dups;
+	}
+
+	public void forgetFile(FileInfo file) {
+		this.sameSizeFiles.remove(file);
+
+		List<FileInfo> dups = getDuplicates(file);
+		if (dups != null) {
+			dups.remove(file);
+
+			if (dups.size() < 2) {
+				this.duplicateFiles.remove(file.checksums);
+			}
+		}
+	}
+
 	public Collection<List<FileInfo>> getDuplicateLists() {
 		return this.duplicateFiles.values();
 	}

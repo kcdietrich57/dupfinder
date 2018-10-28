@@ -304,7 +304,7 @@ public class FolderTreeModel implements TreeModel {
 		Object child = "MISSING";
 
 		if (parent instanceof Database) {
-			return getVisibleChild(Database.instance(), index);
+			child = getVisibleChild(Database.instance(), index);
 		} else if (parent instanceof Context) {
 			child = getVisibleChild(((Context) parent).getRoot(), index);
 		} else if (parent instanceof FolderInfo) {

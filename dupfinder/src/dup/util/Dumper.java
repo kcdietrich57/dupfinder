@@ -8,6 +8,8 @@ import java.util.List;
 import java.util.Set;
 
 import dup.analyze.DupDiffFileInfo;
+import dup.analyze.DuplicateInfo;
+import dup.analyze.DuplicateInfo2;
 import dup.analyze.RegisteredDupDiffInfo;
 import dup.model.Context;
 import dup.model.Database;
@@ -95,14 +97,23 @@ public class Dumper {
 		Trace.traceln();
 		Trace.traceln(Trace.NORMAL, "Verified Duplicates (file)");
 
-		for (FileInfo f : file.getDupinfo().getVerifiedDuplicates()) {
-			Trace.traceln(Trace.NORMAL, " " + f.getFullName());
+		// TODO think about the idea of VERIFIED duplicates
+		DuplicateInfo2 dupinfo = Database.instance().getDuplicateInfo(file);
+		if (dupinfo != null) {
+			List<FileInfo> dups = dupinfo.getDuplicates(file);
+
+			if (dups != null) {
+				for (FileInfo f : dups) {
+					Trace.traceln(Trace.NORMAL, " " + f.getFullName());
+				}
+			}
 		}
 
 		Trace.traceln();
 		Trace.traceln(Trace.NORMAL, "Verified Differences (file)");
 
-		for (FileInfo f : file.getDupinfo().getVerifiedDifferentFiles()) {
+		DuplicateInfo di = file.getDupinfo();
+		for (FileInfo f : di.getVerifiedDifferentFiles()) {
 			Trace.traceln(Trace.NORMAL, " " + f.getFullName());
 		}
 

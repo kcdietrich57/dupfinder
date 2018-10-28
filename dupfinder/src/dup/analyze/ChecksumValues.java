@@ -5,7 +5,7 @@ import java.util.Arrays;
 /** Holds checksum values for a file */
 public class ChecksumValues implements Comparable<ChecksumValues> {
 	public static final int CKSUM_UNDEFINED = 0;
-	public static final int PREFIX_LENGTH=1024;
+	public static final int PREFIX_LENGTH = 1024;
 
 	private static boolean sumsAreEqual(int sum1, int sum2) {
 		return compareSums(sum1, sum2) == 0;
@@ -25,8 +25,12 @@ public class ChecksumValues implements Comparable<ChecksumValues> {
 	}
 
 	public static boolean isIdentical(byte[] bytes1, byte[] bytes2) {
-		return ((bytes1 != null) && (bytes2 != null) //
-				&& Arrays.equals(bytes1, bytes2));
+		if ((bytes1 == null) || (bytes2 == null)) {
+			return true;
+		}
+
+		boolean isequal = Arrays.equals(bytes1, bytes2);
+		return isequal;
 	}
 
 	public static boolean checksumsAreCompatible(int cksum1, int cksum2) {
@@ -106,7 +110,11 @@ public class ChecksumValues implements Comparable<ChecksumValues> {
 		return 0;
 	}
 
-	public String toString() {
+	public int hashCode() {
+		return this.prefix ^ this.sample;
+	}
+
+	 public String toString() {
 		return String.format("Cksum: p=%d s=%d sbLen=%d", //
 				this.prefix, this.sample, //
 				((this.sampleBytes != null) ? this.sampleBytes.length : 0));

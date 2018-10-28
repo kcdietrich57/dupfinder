@@ -61,7 +61,7 @@ public class DuplicateChain {
 	}
 
 	public long getFileSize() {
-		return this.files.get(0).getSize();
+		return (this.files.isEmpty()) ? 0 : this.files.get(0).getSize();
 	}
 
 	/** Locate folders that contain multiple duplicates from this chain */

@@ -1,8 +1,10 @@
 package dup.model;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 
 import dup.analyze.Checksum;
@@ -14,9 +16,19 @@ import dup.analyze.Fingerprint;
 
 /** Class representing a file object */
 public class FileInfo extends FileObjectInfo {
+	public static final Collection<FileInfo> NoFiles = Collections.unmodifiableCollection(new ArrayList<FileInfo>());
+
 	private long filesize;
 	private long timestamp;
 	public final ChecksumValues checksums;
+	/**
+	 * True if the uniqueness of this file has been confirmed. If the file belongs
+	 * to a list of duplicates, it has been compared fully to other confirmed files
+	 * in the list; if the file is not in such a list, it has been eliminated from
+	 * all lists of same-size files via comparison.<br>
+	 * TODO perhaps this is not any better/different than detailLevel == MAX.
+	 */
+	public boolean confirmed;
 
 	public DuplicateInfo2 dupinfo2;
 	private DuplicateInfo dupinfo;
@@ -30,6 +42,7 @@ public class FileInfo extends FileObjectInfo {
 		this.checksums = new ChecksumValues();
 		this.dupinfo2 = null;
 		this.dupinfo = new DuplicateInfo(this);
+		this.confirmed = false;
 	}
 
 	public FileInfo(FolderInfo folder, File file) {
@@ -46,6 +59,9 @@ public class FileInfo extends FileObjectInfo {
 		// TODO bad alias here, copy instead
 		this.dupinfo2 = file.dupinfo2;
 		this.dupinfo = file.dupinfo;
+
+		// TODO uncertain whether a cloned fileinfo should be confirmed or not.
+		this.confirmed = file.confirmed;
 	}
 
 	/**
@@ -122,7 +138,7 @@ public class FileInfo extends FileObjectInfo {
 
 		if (!level.isLessThan(DetailLevel.Sample)) {
 			if (!ChecksumValues.isIdentical(this.getSampleBytes(true), other.getSampleBytes(true)) //
-					|| ChecksumValues.isIdentical(this.getSampleChecksum(true), other.getSampleChecksum(true))) {
+					|| !ChecksumValues.isIdentical(this.getSampleChecksum(true), other.getSampleChecksum(true))) {
 				return false;
 			}
 		}
@@ -170,6 +186,10 @@ public class FileInfo extends FileObjectInfo {
 
 	public void removeFromDuplicateChains() {
 		getDupinfo().removeFromDuplicateChains();
+		DuplicateInfo2 dupinfo = Database.instance().getDuplicateInfo(this);
+		if (dupinfo != null) {
+			dupinfo.forgetFile(this);
+		}
 	}
 
 	public long getLastModified() {
@@ -184,16 +204,67 @@ public class FileInfo extends FileObjectInfo {
 		return this.dupinfo;
 	}
 
+	/**
+	 * Return context duplicates of a file (including the file itself) <br>
+	 * If there are no duplicates, return empty collection
+	 */
 	public Collection<FileInfo> getContextDuplicates() {
-		return getDupinfo().getContextDuplicates();
+		List<FileInfo> dups = getAllDuplicates();
+		if (dups == null) {
+			return FileInfo.NoFiles;
+		}
+
+		List<FileInfo> cdups = new ArrayList<FileInfo>();
+
+		for (FileInfo file : dups) {
+			if ((this != file) && (this.contextid == file.contextid)) {
+				cdups.add(file);
+			}
+		}
+
+		if (!cdups.isEmpty()) {
+			cdups.add(this);
+		}
+
+		Collection<FileInfo> cdups2 = getDupinfo().getContextDuplicates();
+		return cdups2;
 	}
 
 	public void setGlobalDuplicates(List<FileInfo> dups) {
 		getDupinfo().setGlobalDuplicates(dups);
 	}
 
+	/**
+	 * Return global duplicates of a file (including the file itself) <br>
+	 * If there are no duplicates, return empty collection
+	 */
 	public Collection<FileInfo> getGlobalDuplicates() {
-		return getDupinfo().getGlobalDuplicates();
+		List<FileInfo> dups = getAllDuplicates();
+		if (dups == null) {
+			return FileInfo.NoFiles;
+		}
+
+		List<FileInfo> cdups = new ArrayList<FileInfo>();
+
+		for (FileInfo file : dups) {
+			if (this.contextid != file.contextid) {
+				cdups.add(file);
+			}
+		}
+
+		if (!cdups.isEmpty()) {
+			cdups.add(this);
+		}
+
+		// TODO figure out exactly what this is - return cdups;
+		Collection<FileInfo> cdups2 = getDupinfo().getGlobalDuplicates();
+		return cdups2;
+	}
+
+	private List<FileInfo> getAllDuplicates() {
+		DuplicateInfo2 dupinfo = Database.instance().getDuplicateInfo(this);
+
+		return (dupinfo != null) ? dupinfo.getDuplicates(this) : null;
 	}
 
 	public boolean isUnique() {

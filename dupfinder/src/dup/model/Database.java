@@ -138,6 +138,26 @@ public class Database {
 		}
 	}
 
+	public DuplicateInfo2 getDuplicateInfo(FileInfo file) {
+		int idx = Collections.binarySearch(this.duplicates, //
+				new DuplicateInfo2(file.getSize()), //
+				new Comparator<DuplicateInfo2>() {
+					public int compare(DuplicateInfo2 di1, DuplicateInfo2 di2) {
+						long diff = di1.fileSize() - di2.fileSize();
+
+						if (diff < 0) {
+							return -1;
+						} else if (diff == 0) {
+							return 0;
+						} else {
+							return 1;
+						}
+					}
+				});
+
+		return (idx >= 0) ? this.duplicates.get(idx) : null;
+	}
+
 	/** Add file to existing duplicate info database */
 	private void addFileToDuplicates(int idx, FileInfo file) {
 		DuplicateInfo2 dupinfo = getDupinfo(idx, file.getSize());
@@ -287,7 +307,7 @@ public class Database {
 //				Trace.trace(Trace.NORMAL, String.format( //
 //						"  %s", Utility.formatSize(dupinfo.fileSize())));
 			} else {
-				//Trace.trace(Trace.NORMAL, ".");
+				// Trace.trace(Trace.NORMAL, ".");
 			}
 
 			dupinfo.processFiles(level);

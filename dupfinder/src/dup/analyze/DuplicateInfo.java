@@ -1,8 +1,6 @@
 package dup.analyze;
 
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -15,8 +13,6 @@ import dup.util.Trace;
 
 /** Information about file duplicates shared between duplicate files */
 public class DuplicateInfo {
-	private static final Collection<FileInfo> NoFiles = Collections.unmodifiableCollection(new ArrayList<FileInfo>());
-
 	private FileInfo file;
 
 	private Set<FileInfo> verifiedDuplicateFiles = null;
@@ -121,7 +117,7 @@ public class DuplicateInfo {
 	}
 
 	public Collection<FileInfo> getGlobalDuplicates() {
-		return (this.globalDuplicates != null) ? this.globalDuplicates : NoFiles;
+		return (this.globalDuplicates != null) ? this.globalDuplicates : FileInfo.NoFiles;
 	}
 
 	public void setGlobalDuplicates(List<FileInfo> dups) {
@@ -132,7 +128,7 @@ public class DuplicateInfo {
 	}
 
 	public Collection<FileInfo> getContextDuplicates() {
-		return (this.contextDuplicates != null) ? this.contextDuplicates : NoFiles;
+		return (this.contextDuplicates != null) ? this.contextDuplicates : FileInfo.NoFiles;
 	}
 
 	/**
@@ -285,7 +281,7 @@ public class DuplicateInfo {
 		// TODO construct from Database.verifiedIdentical?
 		return (this.verifiedDuplicateFiles != null) //
 				? this.verifiedDuplicateFiles //
-				: NoFiles;
+				: FileInfo.NoFiles;
 	}
 
 	public Collection<FileInfo> getVerifiedDifferentFiles() {
