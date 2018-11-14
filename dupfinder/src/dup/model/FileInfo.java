@@ -159,6 +159,9 @@ public class FileInfo extends FileObjectInfo {
 		if (getName().equals(".DS_Store")) {
 			return true;
 		}
+		if (getName().startsWith("._")) {
+			return true;
+		}
 
 		return false;
 	}
