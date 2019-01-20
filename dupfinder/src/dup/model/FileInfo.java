@@ -111,9 +111,15 @@ public class FileInfo extends FileObjectInfo {
 			return false;
 		}
 
-		boolean compareFiles = false;
+		boolean compareFiles = shouldCompareFile() && !level.isLessThan(DetailLevel.MAX);
 		return !compareFiles //
 				|| Fingerprint.filesAreIdentical(this, other);
+	}
+
+	private static final long COMPARE_THRESHOLD = 1024 * 1024 * 16;
+
+	private boolean shouldCompareFile() {
+		return this.filesize <= COMPARE_THRESHOLD;
 	}
 
 	public boolean checksumsMatch(FileInfo other) {
