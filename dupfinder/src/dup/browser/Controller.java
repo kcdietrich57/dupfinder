@@ -98,7 +98,8 @@ public class Controller {
 
 		FileInfo origfile = Database.instance().findFile(file);
 
-		if (!origfile.isUnique() && origfile.getDetailLevel().isLessThan(detail)) {
+		if (//!origfile.isUnique() && 
+				origfile.getDetailLevel().isLessThan(detail)) {
 			filesToLoad.add(origfile);
 		}
 

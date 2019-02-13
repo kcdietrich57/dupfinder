@@ -176,6 +176,9 @@ public class FileUtil {
 
 		File absFile = new File(context.getRootFile(), folder.getRelativeName());
 		File[] children = absFile.listFiles();
+		if (children == null) {
+			return 0;
+		}
 
 		for (File child : children) {
 			if (child.isDirectory()) {

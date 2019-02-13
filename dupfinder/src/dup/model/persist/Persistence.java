@@ -447,8 +447,11 @@ public class Persistence {
 		data.delete(0, space + 1);
 
 		space = data.indexOf(" ");
-		assert space > 0;
-		finfo.setSampleChecksum(parseIntHex(data.substring(0, space)));
+		if (space > 0) {
+			finfo.setSampleChecksum(parseIntHex(data.substring(0, space)));
+		} else {
+			finfo.setSampleChecksum(parseIntHex(data.toString()));
+		}
 
 		return finfo;
 	}

@@ -118,6 +118,7 @@ public class ContextLoader {
 			}
 
 			folder.addFile(finfo);
+			context.addFile(finfo);
 
 			if (finfo.getDetailLevel().isLessThan(context.getDetailLevel())) {
 				context.setDetailLevel(finfo.getDetailLevel());

@@ -241,31 +241,33 @@ public class Database {
 			context = ingestNewContext(folderPath, contextName);
 		}
 
-		this.contexts.add(context);
+		if (context != null) {
+			this.contexts.add(context);
 
-		Trace.traceln(Trace.NORMAL, "Processing ingested files");
-		processFiles(DetailLevel.Size);
-		summarizeDuplicates();
-		processFiles(DetailLevel.Prefix);
-		summarizeDuplicates();
-		processFiles(DetailLevel.Sample);
-		summarizeDuplicates();
+			Trace.traceln(Trace.NORMAL, "Processing ingested files");
+			processFiles(DetailLevel.Size);
+			summarizeDuplicates();
+			processFiles(DetailLevel.Prefix);
+			summarizeDuplicates();
+			processFiles(DetailLevel.Sample);
+			summarizeDuplicates();
 
-		// TODO the following analysis methods are defunct
-		context.analyzeContextDuplicates();
+			// TODO the following analysis methods are defunct
+			context.analyzeContextDuplicates();
 
-		Trace.traceln(Trace.NORMAL);
-		Trace.traceln(Trace.NORMAL, "Analyzing global duplicates...");
-		Analyzer.analyzeGlobalDuplicates(this.contexts);
+			Trace.traceln(Trace.NORMAL);
+			Trace.traceln(Trace.NORMAL, "Analyzing global duplicates...");
+			Analyzer.analyzeGlobalDuplicates(this.contexts);
 
-		Trace.traceln(Trace.NORMAL, "Checksum calculations: " + Checksum.checksumCount);
-		Trace.traceln(Trace.NORMAL, "File comparisons: " + FileUtil.compareCount);
+			Trace.traceln(Trace.NORMAL, "Checksum calculations: " + Checksum.checksumCount);
+			Trace.traceln(Trace.NORMAL, "File comparisons: " + FileUtil.compareCount);
 
-		long diff = (System.currentTimeMillis() - start + 500) / 1000;
-		Trace.traceln(Trace.NORMAL, "Elapsed time for open = " + diff + " seconds");
+			long diff = (System.currentTimeMillis() - start + 500) / 1000;
+			Trace.traceln(Trace.NORMAL, "Elapsed time for open = " + diff + " seconds");
 
-		// TODO when to save the registered dup/diff info?
-		// Persistence.saveDatabase();
+			// TODO when to save the registered dup/diff info?
+			// Persistence.saveDatabase();
+		}
 
 		Utility.reportMemory("After loading context " + contextName);
 
