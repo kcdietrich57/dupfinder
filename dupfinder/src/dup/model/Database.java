@@ -242,7 +242,15 @@ public class Database {
 		}
 
 		if (context != null) {
-			this.contexts.add(context);
+			int idx = 0;
+			for (; idx < this.contexts.size(); ++idx) {
+				Context ctx = this.contexts.get(idx);
+				if (ctx.getName().compareToIgnoreCase(context.getName()) >= 0) {
+					break;
+				}
+			}
+
+			this.contexts.add(idx, context);
 
 			Trace.traceln(Trace.NORMAL, "Processing ingested files");
 			processFiles(DetailLevel.Size);

@@ -405,8 +405,14 @@ public class FolderTreeModel implements TreeModel {
 			}
 		}
 
+		// TODO implement different sorting
 		Collections.sort(folders, (f1, f2) -> {
-			int diff = f2.getDupCount() - f1.getDupCount();
+			int diff = f1.getName().compareToIgnoreCase(f2.getName());
+			if (diff != 0) {
+				return diff;
+			}
+
+			diff = f2.getDupCount() - f1.getDupCount();
 			if (diff != 0) {
 				return diff;
 			}
