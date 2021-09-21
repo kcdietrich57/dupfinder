@@ -102,7 +102,9 @@ public class Context implements Comparable<Context> {
 	public Context(String rootFolderPath, String name) {
 		this();
 
+		System.out.println("Creating folder for " + rootFolderPath);
 		this.rootFolderFile = new File(rootFolderPath);
+		System.out.println("Folder file " + this.rootFolderFile.getAbsolutePath());
 		this.name = name;
 		this.dirty = false;
 
@@ -211,6 +213,11 @@ public class Context implements Comparable<Context> {
 	public FolderInfo getRoot() {
 		if (this.rootFolder == null) {
 			this.rootFolder = new FolderInfo(this, this.rootFolderFile);
+			String rootpath = this.rootFolderFile.getAbsolutePath();
+			String rootfolder = this.rootFolder.toString();
+			String rootfoldername = this.rootFolder.getFullName();
+			System.out.println("Created root folder for '" + rootpath + "'" //
+					 + ": " + rootfolder + " " + rootfoldername);
 		}
 
 		return this.rootFolder;
@@ -391,7 +398,8 @@ public class Context implements Comparable<Context> {
 		}
 	}
 
-	public void addFile(FileInfo file) {
+	public void addFile(FolderInfo folder, FileInfo file) {
+		folder.addFile(file);
 		FileUtil.addFile(this.allFiles, file);
 	}
 
@@ -599,5 +607,11 @@ public class Context implements Comparable<Context> {
 
 	public File getRootFile() {
 		return this.rootFolderFile;
+	}
+
+	@Override
+	public String toString() {
+		return String.format("Context: %s rootname=%s rootfile=%s", //
+				getName(), getRoot().getFullName(), getRootFile().getAbsolutePath());
 	}
 }

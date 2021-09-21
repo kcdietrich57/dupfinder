@@ -9,6 +9,7 @@ import java.io.InputStreamReader;
 
 import dup.analyze.DetailLevel;
 import dup.model.Context;
+import dup.model.Database;
 import dup.model.FileInfo;
 import dup.model.FolderInfo;
 
@@ -54,7 +55,7 @@ public class ContextLoader {
 					break;
 				}
 
-				line = load(br, context, folderName);
+				line = loadFolder(br, context, folderName);
 				if (line == null) {
 					break;
 				}
@@ -105,7 +106,7 @@ public class ContextLoader {
 	}
 
 	/** Reload persisted context information for a particular folder */
-	private static String load(BufferedReader br, Context context, String folderPath) throws IOException {
+	private static String loadFolder(BufferedReader br, Context context, String folderPath) throws IOException {
 		String line = null;
 
 		File folderFile = new File(folderPath);
@@ -117,8 +118,8 @@ public class ContextLoader {
 				break;
 			}
 
-			folder.addFile(finfo);
-			context.addFile(finfo);
+			Database.instance().addFile(finfo);
+			context.addFile(folder, finfo);
 
 			if (finfo.getDetailLevel().isLessThan(context.getDetailLevel())) {
 				context.setDetailLevel(finfo.getDetailLevel());

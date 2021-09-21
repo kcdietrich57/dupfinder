@@ -446,6 +446,7 @@ public class Persistence {
 		finfo.setPrefixChecksum(parseIntHex(data.substring(0, space)));
 		data.delete(0, space + 1);
 
+		// TODO why would this ever be missing?
 		space = data.indexOf(" ");
 		if (space > 0) {
 			finfo.setSampleChecksum(parseIntHex(data.substring(0, space)));

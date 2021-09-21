@@ -22,6 +22,10 @@ public class Database {
 	public static Collection<DupDiffFileInfo> NoFiles = new ArrayList<DupDiffFileInfo>();
 	public static boolean skipFileComparison = false;
 
+	public static void clear() {
+		instance = null;
+	}
+
 	public static Database instance() {
 		if (instance == null) {
 			Database db = new Database();
@@ -121,14 +125,15 @@ public class Database {
 		}
 	}
 
-	/** Add a file (while ingesting a context) */
+	/** Add a file (while loading/ingesting a context) */
 	public void addFile(FileInfo file) {
 		int idx = FileUtil.addFile(this.files, file);
 
 		boolean isdup = false;
 		if ((idx > 0) && (this.files.get(idx - 1).getSize() == file.getSize())) {
 			isdup = true;
-		} else if ((idx + 1 < this.files.size()) //
+		}
+		if ((idx + 1 < this.files.size()) //
 				&& (this.files.get(idx + 1).getSize() == file.getSize())) {
 			isdup = true;
 		}
@@ -158,7 +163,7 @@ public class Database {
 		return (idx >= 0) ? this.duplicates.get(idx) : null;
 	}
 
-	/** Add file to existing duplicate info database */
+	/** Add file to existing duplicate info database (based on size alone) */
 	private void addFileToDuplicates(int idx, FileInfo file) {
 		DuplicateInfo2 dupinfo = getDupinfo(idx, file.getSize());
 
@@ -211,6 +216,13 @@ public class Database {
 		return dupinfo;
 	}
 
+	// TODO Separate tasks when loading contexts
+	// 1 Add files to context (ingest vs load)
+	// 2 Add files to database
+	// 3 Build dup chains
+	// 4 Compare files and update dup chains
+	// 5 Update UI
+
 	/**
 	 * Set up a new context for a folder.<br>
 	 * If the folder is already open, return the existing context. <br>
@@ -232,6 +244,9 @@ public class Database {
 
 		long start = System.currentTimeMillis();
 		Trace.traceln(Trace.NORMAL, "Loading context " + contextName);
+
+		Database db = Database.instance();
+		System.out.println(String.format("xyzzy: db has %d total files", db.files.size()));
 
 		File savedContext = Persistence.findSavedContext(new File(folderPath));
 		if (savedContext != null) {

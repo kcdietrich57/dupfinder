@@ -89,6 +89,10 @@ public class DuplicateInfo {
 	}
 
 	public boolean hasDuplicatesInFolder() {
+		if (this.contextDuplicates == null) {
+			return false;
+		}
+
 		FolderInfo folder = this.file.getFolder();
 
 		for (FileInfo file : this.contextDuplicates) {
@@ -121,10 +125,10 @@ public class DuplicateInfo {
 	}
 
 	public void setGlobalDuplicates(List<FileInfo> dups) {
-		assert (dups != null);
-
-		this.globalDuplicates = dups;
-		++this.file.getFolder().globalDupCount;
+		if (dups != null) {
+			this.globalDuplicates = dups;
+			this.file.getFolder().globalDupCount += dups.size();
+		}
 	}
 
 	public Collection<FileInfo> getContextDuplicates() {

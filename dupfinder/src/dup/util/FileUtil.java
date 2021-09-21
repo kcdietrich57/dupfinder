@@ -144,21 +144,27 @@ public class FileUtil {
 
 	private static int loadCounter = 0;
 
-	public static int addFile(List<FileInfo> files, FileInfo file) {
-		int idx = Collections.binarySearch(files, file, //
-				new Comparator<FileInfo>() {
-					public int compare(FileInfo f1, FileInfo f2) {
-						long diff = f1.getSize() - f2.getSize();
+	private static Comparator<FileInfo> compareSize = new Comparator<FileInfo>() {
+		public int compare(FileInfo f1, FileInfo f2) {
+			long diff = f1.getSize() - f2.getSize();
 
-						if (diff < 0) {
-							return -1;
-						} else if (diff == 0) {
-							return 0;
-						} else {
-							return 1;
-						}
-					}
-				});
+			if (diff < 0) {
+				return -1;
+			} else if (diff == 0) {
+				return 0;
+			} else {
+				return 1;
+			}
+		}
+	};
+
+	/**
+	 * Add a file to a list of files sorted by size
+	 * 
+	 * @return The index of the file in the list
+	 */
+	public static int addFile(List<FileInfo> files, FileInfo file) {
+		int idx = Collections.binarySearch(files, file, compareSize);
 
 		if (idx < 0) {
 			idx = -(idx + 1);
@@ -188,11 +194,15 @@ public class FileUtil {
 
 				folder.addFolder(childInfo);
 			} else if (child.isFile()) {
+				// Ignore MacOs clutter
+				if (child.getName().equals(".DS_Store")) {
+					continue;
+				}
+
 				FileInfo fileInfo = new FileInfo(folder, child);
 
-				folder.addFile(fileInfo);
 				Database.instance().addFile(fileInfo);
-				context.addFile(fileInfo);
+				context.addFile(folder, fileInfo);
 
 				if ((++loadCounter % 1000) == 0) {
 					Trace.trace(Trace.NORMAL, ".");

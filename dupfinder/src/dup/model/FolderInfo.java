@@ -27,7 +27,7 @@ public class FolderInfo extends FileObjectInfo {
 	public FolderInfo(FolderInfo folder, String name) {
 		super(folder, name);
 	}
-	
+
 	public FolderInfo(Context context, File file) {
 		super(context.id, file);
 	}
@@ -60,7 +60,7 @@ public class FolderInfo extends FileObjectInfo {
 	}
 
 	/** Count all folders under this folder (including this one) */
-	private int getTreeFolderCount() {
+	public int getTreeFolderCount() {
 		int count = 1;
 
 		for (FolderInfo folder : this.folders) {
@@ -128,7 +128,7 @@ public class FolderInfo extends FileObjectInfo {
 	}
 
 	/** Get the sum of the sizes of all non-unique files under this folder */
-	private long getTreeDupSize() {
+	public long getTreeDupSize() {
 		long tot = getFolderDupSize();
 
 		for (FolderInfo folder : this.folders) {
@@ -152,12 +152,12 @@ public class FolderInfo extends FileObjectInfo {
 		return dupcount;
 	}
 
-	private int getGlobalDupCount() {
+	public int getGlobalDupCount() {
 		return this.globalDupCount;
 	}
 
 	/** Count the number of context duplicates under this folder */
-	private int getTreeLocalDupCount() {
+	public int getTreeLocalDupCount() {
 		int count = this.folderDupCount;
 
 		for (FolderInfo folder : this.folders) {
@@ -179,7 +179,7 @@ public class FolderInfo extends FileObjectInfo {
 	}
 
 	/** Get the total count of global duplicates under this folder */
-	private int getTreeGlobalDupCount() {
+	public int getTreeGlobalDupCount() {
 		int count = getGlobalDupCount();
 
 		for (FolderInfo folder : this.folders) {
@@ -190,17 +190,17 @@ public class FolderInfo extends FileObjectInfo {
 	}
 
 	/** Get percentage of non-unique files in this folder */
-	private int getDupPercent() {
+	public int getDupPercent() {
 		return (this.files.isEmpty()) ? 0 : (this.folderDupCount * 100) / getFileCount();
 	}
 
 	/** Get whether all files in this folder are non-unique */
-	private boolean isAllDups() {
+	public boolean isAllDups() {
 		return this.folderDupCount == this.files.size();
 	}
 
 	/** Get whether all files in this sub-tree are non-unique */
-	private boolean isAllTreeDups() {
+	public boolean isAllTreeDups() {
 		if (!isAllDups()) {
 			return false;
 		}
@@ -217,7 +217,7 @@ public class FolderInfo extends FileObjectInfo {
 	}
 
 	/** Get all folders in the sub-tree under this folder */
-	private List<FolderInfo> getTreeFolders() {
+	public List<FolderInfo> getTreeFolders() {
 		List<FolderInfo> folders = new ArrayList<FolderInfo>();
 
 		folders.add(this);
@@ -248,7 +248,7 @@ public class FolderInfo extends FileObjectInfo {
 	}
 
 	/** Get files that duplicate other files in this folder */
-	private List<FileInfo> getDuplicateFilesInFolder(boolean recurse) {
+	public List<FileInfo> getDuplicateFilesInFolder(boolean recurse) {
 		// TODO recurse is not used
 		Set<FileInfo> files = new HashSet<FileInfo>();
 
@@ -264,7 +264,11 @@ public class FolderInfo extends FileObjectInfo {
 	}
 
 	/** Locate a FolderInfo for a path string */
-	private FolderInfo findFolderFromPath(String path) {
+	public FolderInfo findFolderFromPath(String path) {
+		if (path == null) {
+			return null;
+		}
+
 		StringTokenizer toker = new StringTokenizer(path, "/");
 
 		if (!toker.hasMoreTokens()) {
@@ -293,7 +297,7 @@ public class FolderInfo extends FileObjectInfo {
 	}
 
 	/** Locate a sub-folder by name in this folder */
-	private FolderInfo findFolder(String name) {
+	public FolderInfo findFolder(String name) {
 		for (FolderInfo folder : this.folders) {
 			if (folder.getName().equals(name)) {
 				return folder;
