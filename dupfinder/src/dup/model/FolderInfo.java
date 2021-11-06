@@ -15,11 +15,6 @@ public class FolderInfo extends FileObjectInfo {
 	private final List<FolderInfo> folders = new ArrayList<FolderInfo>();
 	private final List<FileInfo> files = new ArrayList<FileInfo>();
 
-	/** Count of non-unique files in this folder */
-	public int folderDupCount = 0;
-	/** Count of non-local, non-unique files in this folder */
-	public int globalDupCount = 0;
-
 	public FolderInfo(FolderInfo folder, File file) {
 		super(folder, file);
 	}
@@ -77,7 +72,7 @@ public class FolderInfo extends FileObjectInfo {
 
 	/** Count all files under this folder */
 	public int getTreeFileCount() {
-		int count = this.files.size();
+		int count = getFileCount();
 
 		for (FolderInfo folder : this.folders) {
 			count += folder.getTreeFileCount();
@@ -139,6 +134,14 @@ public class FolderInfo extends FileObjectInfo {
 		return tot;
 	}
 
+	public int getUniqueCount() {
+		return getFileCount() - getDupCount();
+	}
+
+	public int getTreeUniqueCount() {
+		return getTreeFileCount() - getTreeDupCount();
+	}
+
 	/** Count the number of non-unique files in this folder */
 	public int getDupCount() {
 		int dupcount = 0;
@@ -152,13 +155,34 @@ public class FolderInfo extends FileObjectInfo {
 		return dupcount;
 	}
 
+	public int getLocalDupCount() {
+		int dupcount = 0;
+
+		for (FileInfo file : this.files) {
+			if (file.hasContextDuplicates()) {
+				++dupcount;
+			}
+		}
+
+		return dupcount;
+	}
+
 	public int getGlobalDupCount() {
-		return this.globalDupCount;
+		// return this.globalDupCount;
+		int dupcount = 0;
+
+		for (FileInfo file : this.files) {
+			if (file.hasGlobalDuplicates()) {
+				++dupcount;
+			}
+		}
+
+		return dupcount;
 	}
 
 	/** Count the number of context duplicates under this folder */
 	public int getTreeLocalDupCount() {
-		int count = this.folderDupCount;
+		int count = getLocalDupCount(); // this.folderDupCount;
 
 		for (FolderInfo folder : this.folders) {
 			count += folder.getTreeLocalDupCount();
@@ -189,14 +213,14 @@ public class FolderInfo extends FileObjectInfo {
 		return count;
 	}
 
-	/** Get percentage of non-unique files in this folder */
+	/** Get percentage (rounded down) of non-unique files in this folder */
 	public int getDupPercent() {
-		return (this.files.isEmpty()) ? 0 : (this.folderDupCount * 100) / getFileCount();
+		return (getDupCount() * 100) / getFileCount();
 	}
 
 	/** Get whether all files in this folder are non-unique */
 	public boolean isAllDups() {
-		return this.folderDupCount == this.files.size();
+		return getDupCount() == this.files.size();
 	}
 
 	/** Get whether all files in this sub-tree are non-unique */

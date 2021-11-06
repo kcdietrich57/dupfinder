@@ -8,8 +8,8 @@ public enum DetailLevel {
 
 	public static final DetailLevel MAX = Sample;
 
-	int intval;
-	String name;
+	public int intval;
+	public String name;
 
 	private DetailLevel(int value, String name) {
 		this.intval = value;
@@ -26,6 +26,18 @@ public enum DetailLevel {
 
 	public boolean isGreaterThan(DetailLevel other) {
 		return this.intval > other.intval;
+	}
+
+	public DetailLevel nextLevel() {
+		switch (this.intval) {
+		case 0:
+			return Size;
+		case 1:
+			return Prefix;
+		case 2:
+		default:
+			return Sample;
+		}
 	}
 
 	public String toString() {

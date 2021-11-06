@@ -2,12 +2,9 @@ package dup.analyze;
 
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 import dup.model.FileInfo;
-import dup.model.FolderInfo;
 
 /** This represents a group of duplicate files */
 public class DuplicateChain {
@@ -64,23 +61,23 @@ public class DuplicateChain {
 		return (this.files.isEmpty()) ? 0 : this.files.get(0).getSize();
 	}
 
-	/** Locate folders that contain multiple duplicates from this chain */
-	private List<FolderInfo> getFoldersWithMultipleDuplicates() {
-		Set<FolderInfo> folders = new HashSet<FolderInfo>();
-
-		for (int ii = 0; ii < this.files.size(); ++ii) {
-			FileInfo f1 = this.files.get(ii);
-
-			for (int jj = ii + 1; jj < this.files.size(); ++jj) {
-				FileInfo f2 = this.files.get(jj);
-
-				if (f1.getFolder() == f2.getFolder()) {
-					folders.add(f2.getFolder());
-					break;
-				}
-			}
-		}
-
-		return new ArrayList<FolderInfo>(folders);
-	}
+//	/** Locate folders that contain multiple duplicates from this chain */
+//	private List<FolderInfo> getFoldersWithMultipleDuplicates() {
+//		Set<FolderInfo> folders = new HashSet<FolderInfo>();
+//
+//		for (int ii = 0; ii < this.files.size(); ++ii) {
+//			FileInfo f1 = this.files.get(ii);
+//
+//			for (int jj = ii + 1; jj < this.files.size(); ++jj) {
+//				FileInfo f2 = this.files.get(jj);
+//
+//				if (f1.getFolder() == f2.getFolder()) {
+//					folders.add(f2.getFolder());
+//					break;
+//				}
+//			}
+//		}
+//
+//		return new ArrayList<FolderInfo>(folders);
+//	}
 }

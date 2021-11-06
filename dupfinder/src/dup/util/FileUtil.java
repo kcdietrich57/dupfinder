@@ -111,8 +111,8 @@ public class FileUtil {
 			return 0;
 		}
 
-		int count = context.getFileCount(true);
-		if (count > 0) {
+		int count = context.getFileCount();
+		if (count >= 0) {
 			return count;
 		}
 
@@ -127,8 +127,8 @@ public class FileUtil {
 		int fileCount = ingestTree(context, folder);
 		Trace.traceln(Trace.NORMAL);
 
-		context.determineDetailLevel();
-		context.determineCurrentFileCount();
+		//context.determineDetailLevel();
+		//context.determineCurrentFileCount();
 
 		Trace.traceln(Trace.NORMAL);
 		Trace.traceln(Trace.NORMAL, "Ingested " + fileCount + " files");
@@ -137,7 +137,7 @@ public class FileUtil {
 			ingestFileDetails(context, detail);
 		}
 
-		context.determineDetailLevel();
+		//context.determineDetailLevel();
 
 		return fileCount;
 	}
@@ -211,7 +211,7 @@ public class FileUtil {
 			}
 		}
 
-		context.determineDetailLevel();
+		//context.determineDetailLevel();
 
 		return folder.getTreeFileCount();
 	}
@@ -235,7 +235,7 @@ public class FileUtil {
 			}
 		}
 
-		context.determineDetailLevel();
+		//context.determineDetailLevel();
 
 		return filecount;
 	}

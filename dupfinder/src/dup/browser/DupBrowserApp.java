@@ -48,7 +48,8 @@ import dup.util.Utility;
 public class DupBrowserApp {
 	private static void createAndShowGUI() {
 		// Force load environment
-		Database db = Database.instance();
+		//Database db =
+		Database.instance();
 
 		JFrame frame = new JFrame("Duplicate Browser");
 		frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
@@ -71,8 +72,6 @@ public class DupBrowserApp {
 				super.windowClosing(e);
 			}
 		});
-
-		db.analyzeDuplicates();
 
 		frame.setVisible(true);
 	}

@@ -3,15 +3,11 @@ package dup.model;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 
-import dup.analyze.Analyzer;
 import dup.analyze.Checksum;
 import dup.analyze.DetailLevel;
 import dup.analyze.DupDiffFileInfo;
-import dup.analyze.DuplicateInfo2;
 import dup.model.persist.ContextLoader;
 import dup.model.persist.Persistence;
 import dup.util.FileUtil;
@@ -42,11 +38,12 @@ public class Database {
 	private static Database instance = null;
 
 	private List<Context> contexts = new ArrayList<Context>();
-	private List<FileInfo> files = new ArrayList<FileInfo>();
-	public final List<DuplicateInfo2> duplicates = new ArrayList<DuplicateInfo2>();
 
-	/** TODO Flags whether the file model is initialized yet */
-	private boolean modelAvailable = false;
+	/** All files, sorted by size, duplicates grouped together */
+	private List<FileInfo> files = new ArrayList<FileInfo>();
+
+	/** Groups of duplicate (as far as we know) files, ordered by file size */
+	private List<List<FileInfo>> groups = new ArrayList<List<FileInfo>>();
 
 	private Database() {
 		FileUtil.setupDBFolder();
@@ -57,10 +54,6 @@ public class Database {
 	// Trivial getters/setters
 	public List<Context> getContexts() {
 		return this.contexts;
-	}
-
-	public void setModelAvailable(boolean yesno) {
-		this.modelAvailable = yesno;
 	}
 
 	// =========================================================
@@ -104,7 +97,7 @@ public class Database {
 		// }
 		// }
 
-		analyzeDuplicates();
+		figureDuplicates();
 	}
 
 	/** Close a context */
@@ -112,7 +105,8 @@ public class Database {
 		if (this.contexts.contains(context)) {
 			// TODO autosave - saveContext(context);
 			this.contexts.remove(context);
-			analyzeDuplicates();
+			// analyzeDuplicates();
+			figureDuplicates();
 		}
 	}
 
@@ -127,93 +121,24 @@ public class Database {
 
 	/** Add a file (while loading/ingesting a context) */
 	public void addFile(FileInfo file) {
-		int idx = FileUtil.addFile(this.files, file);
-
-		boolean isdup = false;
-		if ((idx > 0) && (this.files.get(idx - 1).getSize() == file.getSize())) {
-			isdup = true;
-		}
-		if ((idx + 1 < this.files.size()) //
-				&& (this.files.get(idx + 1).getSize() == file.getSize())) {
-			isdup = true;
-		}
-
-		if (isdup) {
-			addFileToDuplicates(idx, file);
-		}
+		FileUtil.addFile(this.files, file);
 	}
 
-	public DuplicateInfo2 getDuplicateInfo(FileInfo file) {
-		int idx = Collections.binarySearch(this.duplicates, //
-				new DuplicateInfo2(file.getSize()), //
-				new Comparator<DuplicateInfo2>() {
-					public int compare(DuplicateInfo2 di1, DuplicateInfo2 di2) {
-						long diff = di1.fileSize() - di2.fileSize();
+	public void removeFile(FileInfo file) {
+		List<FileInfo> group = getAllDuplicates(file);
 
-						if (diff < 0) {
-							return -1;
-						} else if (diff == 0) {
-							return 0;
-						} else {
-							return 1;
-						}
-					}
-				});
-
-		return (idx >= 0) ? this.duplicates.get(idx) : null;
-	}
-
-	/** Add file to existing duplicate info database (based on size alone) */
-	private void addFileToDuplicates(int idx, FileInfo file) {
-		DuplicateInfo2 dupinfo = getDupinfo(idx, file.getSize());
-
-		dupinfo.addFile(file);
-	}
-
-	/** Get or create duplicate info for a given file size */
-	private DuplicateInfo2 getDupinfo(int fileidx, long size) {
-		DuplicateInfo2 dupinfo = new DuplicateInfo2(size);
-
-		int dupidx = Collections.binarySearch(this.duplicates, //
-				dupinfo, //
-				new Comparator<DuplicateInfo2>() {
-					public int compare(DuplicateInfo2 d1, DuplicateInfo2 d2) {
-						long diff = d1.fileSize() - d2.fileSize();
-						if (diff < 0) {
-							return -1;
-						} else if (diff > 0) {
-							return 1;
-						} else {
-							return 0;
-						}
-					}
-				});
-
-		if (dupidx >= 0) {
-			dupinfo = this.duplicates.get(dupidx);
-		} else {
-			this.duplicates.add(-dupidx - 1, dupinfo);
-
-			for (int idx = fileidx - 1; idx > 0; --idx) {
-				FileInfo file = this.files.get(idx);
-				if (file.getSize() != size) {
-					break;
-				}
-
-				dupinfo.addFile(file);
+		if (group != null) {
+			clearDuplicateInfo(group);
+			
+			if (group.size() < 3) {
+				this.groups.remove(group);
 			}
 
-			for (int idx = fileidx + 1; idx < this.files.size(); ++idx) {
-				FileInfo file = this.files.get(idx);
-				if (file.getSize() != size) {
-					break;
-				}
-
-				dupinfo.addFile(file);
-			}
+			group.remove(file);
+			setDuplicateFlags(group);
 		}
 
-		return dupinfo;
+		this.files.remove(file);
 	}
 
 	// TODO Separate tasks when loading contexts
@@ -246,7 +171,6 @@ public class Database {
 		Trace.traceln(Trace.NORMAL, "Loading context " + contextName);
 
 		Database db = Database.instance();
-		System.out.println(String.format("xyzzy: db has %d total files", db.files.size()));
 
 		File savedContext = Persistence.findSavedContext(new File(folderPath));
 		if (savedContext != null) {
@@ -267,20 +191,21 @@ public class Database {
 
 			this.contexts.add(idx, context);
 
-			Trace.traceln(Trace.NORMAL, "Processing ingested files");
-			processFiles(DetailLevel.Size);
-			summarizeDuplicates();
-			processFiles(DetailLevel.Prefix);
-			summarizeDuplicates();
-			processFiles(DetailLevel.Sample);
-			summarizeDuplicates();
+			db.figureDuplicates();
+
+//			Trace.traceln(Trace.NORMAL, "Processing ingested files");
+//			processFiles(DetailLevel.Size);
+//			summarizeDuplicates();
+//			processFiles(DetailLevel.Prefix);
+//			summarizeDuplicates();
+//			processFiles(DetailLevel.Sample);
+//			summarizeDuplicates();
 
 			// TODO the following analysis methods are defunct
-			context.analyzeContextDuplicates();
 
-			Trace.traceln(Trace.NORMAL);
-			Trace.traceln(Trace.NORMAL, "Analyzing global duplicates...");
-			Analyzer.analyzeGlobalDuplicates(this.contexts);
+			// Trace.traceln(Trace.NORMAL);
+			// Trace.traceln(Trace.NORMAL, "Analyzing global duplicates...");
+			// Analyzer.analyzeGlobalDuplicates(this.contexts);
 
 			Trace.traceln(Trace.NORMAL, "Checksum calculations: " + Checksum.checksumCount);
 			Trace.traceln(Trace.NORMAL, "File comparisons: " + FileUtil.compareCount);
@@ -297,49 +222,33 @@ public class Database {
 		return context;
 	}
 
+	private int getDupCount() {
+		int numdups = 0;
+
+		for (List<FileInfo> group : this.groups) {
+			numdups += group.size();
+		}
+
+		return numdups;
+	}
+
 	private void summarizeDuplicates() {
-		int numchains = 0;
-		int numfiles = 0;
 		int longchain = 0;
 
-		for (DuplicateInfo2 dupinfo : this.duplicates) {
-			for (List<FileInfo> dups : dupinfo.getDuplicateLists()) {
-				++numchains;
-				numfiles += dups.size();
-				if (dups.size() > longchain) {
-					longchain = dups.size();
-				}
+		for (List<FileInfo> group : this.groups) {
+			if (group.size() > longchain) {
+				longchain = group.size();
 			}
 		}
 
 		Trace.traceln(Trace.NORMAL, String.format(//
-				"%d files in %d chains (long %d)", numfiles, numchains, longchain));
+				"%d files in %d chains (long %d)", //
+				getDupCount(), this.groups.size(), longchain));
 	}
 
-	/** Perform analysis on each group of same-size files */
-	private void processFiles(DetailLevel level) {
-		int nn = this.duplicates.size();
-
-		Trace.traceln(Trace.NORMAL, String.format( //
-				"Processing chains %d detail %s", //
-				nn, level.toString()));
-
-		for (int ii = 0; ii < nn; ++ii) {
-			DuplicateInfo2 dupinfo = this.duplicates.get(ii);
-
-			if ((nn < 100) || ((ii % (nn / 100)) == 0)) {
-				Trace.trace(Trace.NORMAL, ".");
-//				Trace.trace(Trace.NORMAL, String.format( //
-//						"  %s", Utility.formatSize(dupinfo.fileSize())));
-			} else {
-				// Trace.trace(Trace.NORMAL, ".");
-			}
-
-			dupinfo.processFiles(level);
-		}
-
-		Trace.traceln(Trace.NORMAL);
-	}
+//	/** Perform analysis on each group of same-size files */
+//	private void processFiles(DetailLevel level) {
+//	}
 
 	/** Find an existing context with a particular root folder */
 	public Context getContextForRoot(FolderInfo root) {
@@ -457,20 +366,20 @@ public class Database {
 
 	/** TODO defunct - analyze duplicate info */
 	public void analyzeDuplicates() {
-		if (this.modelAvailable) {
-			// Too early during initialization to do this properly
-			return;
-		}
-
-		// for (Context context : contexts) {
-		// context.restartAnalysis();
-		// }
-
-		for (Context context : this.contexts) {
-			context.analyzeContextDuplicates();
-		}
-
-		Analyzer.analyzeGlobalDuplicates(this.contexts);
+//		if (this.modelAvailable) {
+//			// Too early during initialization to do this properly
+//			return;
+//		}
+//
+//		// for (Context context : contexts) {
+//		// context.restartAnalysis();
+//		// }
+//
+//		for (Context context : this.contexts) {
+//			context.analyzeContextDuplicates();
+//		}
+//
+//		Analyzer.analyzeGlobalDuplicates(this.contexts);
 	}
 
 	// private ContextMonitor contextMonitor;
@@ -591,6 +500,573 @@ public class Database {
 	//
 	// return found;
 	// }
+
+	private void clearDuplicateInfo(List<FileInfo> files) {
+		for (FileInfo f : files) {
+			f.clearDuplicateInfo();
+		}
+	}
+
+	private List<FileInfo> makeGroup( //
+			List<FileInfo> files, int start, int end) {
+		List<FileInfo> newgroup = new ArrayList<>(files.subList(start, end));
+		clearDuplicateInfo(newgroup);
+
+		for (int n = start; n < end; ++n) {
+			FileInfo f1 = files.get(n);
+
+			for (int i = n + 1; i < end && f1.unique != FileInfo.BDUP; ++i) {
+				FileInfo f2 = files.get(i);
+
+				int u = (f1.contextid == f2.contextid) //
+						? FileInfo.LDUP //
+						: FileInfo.GDUP;
+
+				f1.unique |= u;
+				f2.unique |= u;
+			}
+		}
+
+		return newgroup;
+	}
+
+	public void figureDuplicates() {
+		System.out.println("Processing files........");
+
+		int ops = normalizeDetailLevel();
+
+//		// List of groups containing files that are dups of each other
+//		this.groups.clear();
+//		this.groups.add(this.files);
+
+		partitionGroups();
+
+		System.out.println("File processing complete.......");
+		System.out.println(String.format("Worked on %d files", ops));
+
+		int uniqueCount = 0;
+		int gdupCount = 0;
+		int ldupCount = 0;
+		int bdupCount = 0;
+
+		for (FileInfo f : this.files) {
+			switch (f.unique) {
+			case FileInfo.UNIQUE:
+				++uniqueCount;
+				break;
+			case FileInfo.GDUP:
+				++gdupCount;
+				break;
+			case FileInfo.LDUP:
+				++ldupCount;
+				break;
+			case FileInfo.BDUP:
+			default:
+				++bdupCount;
+				break;
+			}
+		}
+
+		System.out.println(String.format("Total files: %d", this.files.size()));
+		System.out.println(String.format( //
+				"Unique files: %d gdup: %d ldup: %d bdup: %d", //
+				uniqueCount, gdupCount, ldupCount, bdupCount));
+		System.out.println(String.format("Duplicate groups: %d", this.groups.size()));
+
+		long groupsSize = 0;
+		int groupsFileCount = 0;
+
+		for (List<FileInfo> group : this.groups) {
+			System.out.println("========");
+			for (FileInfo f : group) {
+				System.out.println(String.format("  %3d: %d %s", //
+						f.contextid, f.unique, f.getFullName()));
+			}
+
+			groupsFileCount += group.size();
+			groupsSize += group.size() * group.get(0).getSize();
+		}
+
+		System.out.println(String.format("Duplicate files: %d", groupsFileCount));
+		System.out.println(String.format("Total size: %s", Utility.formatSize(groupsSize)));
+
+		System.out.println("======");
+	}
+
+	/** Check whether all files are duplicates by each other AFAIK. */
+	private boolean allDuplicates(List<FileInfo> files) {
+		if (files.size() < 2) {
+			return true;
+		}
+
+		FileInfo firstfile = files.get(0);
+
+		for (FileInfo f : files) {
+			if (f.getSize() != firstfile.getSize() //
+					|| !f.mayBeDuplicateOf(firstfile)) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	private boolean hasPotentialDuplicates(List<FileInfo> group) {
+		for (int ii = 0; ii < group.size() - 1; ++ii) {
+			FileInfo file = group.get(ii);
+			if (file.isIgnoredFile()) {
+				continue;
+			}
+
+			for (int jj = ii + 1; jj < group.size(); ++jj) {
+				FileInfo other = group.get(jj);
+
+				if (file.mayBeDuplicateOf(other) //
+						&& (file.getDetailLevel().isLessThan(DetailLevel.MAX) //
+								|| other.getDetailLevel().isLessThan(DetailLevel.MAX))) {
+					return true;
+				}
+			}
+		}
+
+		return false;
+	}
+
+	long[] getWorkingSize(List<FileInfo> group) {
+		long[] ret = new long[2];
+
+		for (FileInfo file : group) {
+			if (file.getDetailLevel().isLessThan(DetailLevel.MAX)) {
+				++ret[0];
+				ret[1] += file.filesize;
+			}
+		}
+
+		return ret;
+	}
+
+	/**
+	 * Re-analyze groups from scratch. This is necessary, for instance, when new
+	 * files are introduced that may be dups of files in different groups. The
+	 * easiest way to do this is to reset the subgroups and consider all same-sized
+	 * files, calculating checksums as necessary to partition into duplicate groups.
+	 * 
+	 * @return Count of checksum calculations that were performed
+	 */
+	private int normalizeDetailLevel() {
+		int didwork = 0;
+
+		System.out.println("Normalizing all duplicate info...");
+		if (this.files.isEmpty()) {
+			return 0;
+		}
+
+		// Clear all group info
+		clearDuplicateInfo(this.files);
+		this.groups.clear();
+
+		System.out.println("Building same-size chains...");
+
+		int numfiles = 0;
+		long totsize = 0;
+
+		// Gather all same-size files into groups
+		for (int start = 0; start < this.files.size();) {
+			FileInfo ffile = this.files.get(start);
+			int end = start + 1;
+
+			while (end < this.files.size() && this.files.get(end).filesize == ffile.filesize) {
+				++end;
+			}
+
+			if (end - start > 1) {
+				// System.out.println("Found same-size files");
+				List<FileInfo> newgroup = new ArrayList<>(this.files.subList(start, end));
+				this.groups.add(newgroup);
+
+				numfiles += newgroup.size();
+				totsize += newgroup.size() * ffile.filesize;
+			}
+
+			start = end;
+		}
+
+		System.out.println(String.format( //
+				"Found %d files in %d chains, total size %s", //
+				numfiles, this.groups.size(), totsize));
+		if (this.groups.isEmpty()) {
+			return 0;
+		}
+
+		List<List<FileInfo>> workingGroups = new ArrayList<List<FileInfo>>();
+
+		System.out.println("Eliminating known duplicate/unique files...");
+		numfiles = 0;
+		totsize = 0;
+		int numfilesWorking = 0;
+		long totsizeWorking = 0;
+
+		for (List<FileInfo> group : this.groups) {
+			if (hasPotentialDuplicates(group)) {
+				workingGroups.add(group);
+
+				numfiles += group.size();
+				totsize += group.size() * group.get(0).filesize;
+
+				long[] work = getWorkingSize(group);
+				numfilesWorking += (int) work[0];
+				totsizeWorking += work[1];
+			}
+		}
+
+		System.out.println(String.format( //
+				"Normalizing %d files in %d chains, total size %s ...", //
+				numfiles, workingGroups.size(), totsize));
+		System.out.println(String.format( //
+				"Working files: %d files total size: %d ...", //
+				numfilesWorking, totsizeWorking));
+
+		// Normalize the checksums for each group
+		for (int grpnum = 0; grpnum < workingGroups.size(); ++grpnum) {
+			List<FileInfo> group = workingGroups.get(grpnum);
+
+			long[] work = getWorkingSize(group);
+			System.out.println(String.format( //
+					"Group %d/%d [%s] Working files: %d/%d size %d\n  Total remaining files: %d [%s]", //
+					grpnum + 1, workingGroups.size(), //
+					Utility.formatSize(group.get(0).filesize), //
+					work[0], group.size(), work[1], //
+					numfilesWorking, //
+					Utility.formatSize(totsizeWorking)));
+			numfilesWorking -= (int) work[0];
+			totsizeWorking -= work[1];
+
+			// For any pair of files that may be duplicates, calculate checksums
+			// as needed to determine whether they are indeed duplicates
+			for (int ii = 0; ii < group.size() - 1; ++ii) {
+				FileInfo file = group.get(ii);
+
+				for (int jj = ii + 1; jj < group.size(); ++jj) {
+					FileInfo other = group.get(jj);
+
+//					System.out.println(String.format( //
+//							"Comparing files\n  %s\n  %s", //
+//							file.toString(), other.toString()));
+
+					while (file.mayBeDuplicateOf(other) //
+							&& (file.getDetailLevel().isLessThan(DetailLevel.MAX) //
+									|| other.getDetailLevel().isLessThan(DetailLevel.MAX))) {
+						if (improveChecksums( //
+								(file.getDetailLevel().isLessThan(other.getDetailLevel())) //
+										? file
+										: other)) {
+							++didwork;
+						}
+					}
+				}
+			}
+		}
+
+		return didwork;
+	}
+
+//	private DetailLevel minDetailLevel(List<FileInfo> group) {
+//		DetailLevel minlevel = DetailLevel.MAX;
+//
+//		for (FileInfo file : group) {
+//			if (minlevel.intval > file.getDetailLevel().intval) {
+//				minlevel = file.getDetailLevel();
+//			}
+//		}
+//
+//		return minlevel;
+//	}
+
+	private boolean improveChecksums(FileInfo file) {
+		if (file.getDetailLevel() == DetailLevel.MAX) {
+			return false;
+		}
+
+		file.calcChecksums(file.getContext(), file.getDetailLevel().nextLevel());
+
+		return true;
+	}
+
+//	private boolean improveChecksums(List<FileInfo> group) {
+//		DetailLevel minlevel = minDetailLevel(group);
+//		if (minlevel == DetailLevel.MAX) {
+//			return false;
+//		}
+//
+//		DetailLevel nextLevel = minlevel.nextLevel();
+//		for (FileInfo file : group) {
+//			file.calcChecksums(file.getContext(), nextLevel);
+//		}
+//
+//		return true;
+//	}
+
+//	private void resetDuplicateFlags(List<FileInfo> group) {
+//		clearDuplicateInfo(group);
+//		setDuplicateFlags(group);
+//	}
+
+	private void setDuplicateFlags(List<FileInfo> group) {
+		for (int n = 0; n < group.size(); ++n) {
+			FileInfo f1 = group.get(n);
+
+			for (int i = n + 1; i < group.size() && f1.unique != FileInfo.BDUP; ++i) {
+				FileInfo f2 = group.get(i);
+
+				int u = (f1.contextid == f2.contextid) //
+						? FileInfo.LDUP //
+						: FileInfo.GDUP;
+
+				f1.unique |= u;
+				f2.unique |= u;
+			}
+		}
+	}
+
+	private int addGroup(List<FileInfo> group) {
+		int idx = findGroup(group.get(0).filesize);
+
+		if (idx < 0) {
+			idx = -idx - 1;
+		}
+
+		if (idx < this.groups.size()) {
+			this.groups.add(idx, group);
+		} else {
+			this.groups.add(group);
+		}
+
+		return idx;
+	}
+
+	/**
+	 * Partition file list into groups of duplicate files, toss unique files<br>
+	 * The file list must be normalized - i.e. we have calculated all necessary
+	 * checksums.
+	 */
+	private void partitionGroups() {
+		for (List<FileInfo> group : new ArrayList<List<FileInfo>>(this.groups)) {
+			partitionGroup(group);
+		}
+	}
+
+	private void partitionGroup(List<FileInfo> group) {
+		if (hasPotentialDuplicates(group)) {
+			System.out.println("ERROR: Normalize before partitioning!");
+			System.exit(1);
+		}
+
+		if (group.size() < 2) {
+			this.groups.remove(group);
+			return;
+		}
+
+		if (allDuplicates(group)) {
+			// All duplicates - no partitioning required
+			setDuplicateFlags(group);
+			return;
+		}
+
+		// Partition the group
+		this.groups.remove(group);
+		clearDuplicateInfo(group);
+
+		int groupstart = 0;
+		int groupend = groupstart + 1;
+
+		// Sort the group to position duplicates together
+		while (groupstart < group.size()) {
+			FileInfo firstfile = group.get(groupstart);
+
+			for (int n = groupstart + 1; n < group.size(); ++n) {
+				FileInfo nextfile = group.get(n);
+				if (firstfile.getSize() < nextfile.getSize()) {
+					// Group is already sorted by size
+					break;
+				}
+
+				if (firstfile.mayBeDuplicateOf(nextfile)) {
+					if (n > groupend) {
+						// Relocate the duplicate to the end of the subgroup
+						group.set(n, group.get(groupend));
+						group.set(groupend, nextfile);
+					}
+
+					++groupend;
+				}
+			}
+
+			if (groupend == groupstart + 1) {
+				// Single file is (still) unique, no group needed
+			} else {
+				List<FileInfo> newgroup = makeGroup(group, groupstart, groupend);
+
+				if (!allDuplicates(newgroup)) {
+					System.out.println("Subgroup is not normalized!");
+					System.exit(1);
+				}
+
+				addGroup(newgroup);
+			}
+
+			groupstart = groupend;
+			++groupend;
+		}
+	}
+
+	private long groupFileSize(int grpidx) {
+		return this.groups.get(grpidx).get(0).filesize;
+	}
+
+	public int findGroup(long filesize) {
+		if (this.groups.isEmpty()) {
+			return -1;
+		}
+
+		int first = 0;
+		int last = this.groups.size() - 1;
+
+		long fsize = groupFileSize(first);
+		if (fsize == filesize) {
+			return first;
+		}
+		if (fsize > filesize) {
+			return -1;
+		}
+
+		while (last > 0 && groupFileSize(last - 1) == filesize) {
+			--last;
+		}
+
+		fsize = groupFileSize(last);
+		if (fsize == filesize) {
+			return last;
+		}
+		if (fsize < filesize) {
+			return -(last + 1);
+		}
+
+		int lastprobe = -1;
+
+		for (;;) {
+			int probe = (last + first + 1) / 2;
+			if (probe == lastprobe) {
+				return (groupFileSize(probe) < filesize) //
+						? probe + 1 //
+						: probe;
+			}
+			lastprobe = probe;
+
+			if (groupFileSize(probe) == filesize) {
+				while (probe > first && groupFileSize(probe - 1) == filesize) {
+					--probe;
+				}
+
+				return probe;
+			}
+
+			if (groupFileSize(probe) < filesize) {
+				first = probe;
+			} else {
+				last = probe;
+			}
+		}
+	}
+
+	public List<FileInfo> getAllDuplicates(FileInfo file) {
+		if (file.isUnique()) {
+			return null;
+		}
+
+		int groupidx = findGroup(file.filesize);
+		if (groupidx < 0) {
+			return null;
+		}
+
+		for (;; ++groupidx) {
+			List<FileInfo> group = this.groups.get(groupidx);
+			if (group.get(0).filesize > file.filesize) {
+				return null;
+			}
+
+			if (group.contains(file)) {
+				return group;
+			}
+		}
+
+//		List<FileInfo> ret = null;
+//
+//		for (List<FileInfo> group : this.groups) {
+//			if (group.contains(file)) {
+//				if (ret != null) {
+//					System.out.println("xyzzy - file belongs to multiple groups");
+//				}
+//				ret = group;
+//			}
+//		}
+//
+//		return ret;
+	}
+
+	private boolean groupIncludesContext(Context ctx, List<FileInfo> group) {
+		for (FileInfo f : group) {
+			if (f.contextid == ctx.id) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	public List<List<FileInfo>> getGroups(Context ctx) {
+		List<List<FileInfo>> grps = new ArrayList<List<FileInfo>>();
+
+		for (List<FileInfo> group : this.groups) {
+			if (groupIncludesContext(ctx, group)) {
+				grps.add(group);
+			}
+		}
+
+		return grps;
+	}
+
+	public List<FileInfo> getContextDuplicates(FileInfo file) {
+		if (!file.hasContextDuplicates()) {
+			return null;
+		}
+
+		List<FileInfo> dups = new ArrayList<>();
+
+		for (FileInfo f : getAllDuplicates(file)) {
+			if (f.contextid == file.contextid) {
+				dups.add(f);
+			}
+		}
+
+		return dups;
+	}
+
+	public List<FileInfo> getGlobalDuplicates(FileInfo file) {
+		if (!file.hasGlobalDuplicates()) {
+			return null;
+		}
+
+		List<FileInfo> dups = new ArrayList<>();
+		dups.add(file);
+
+		for (FileInfo f : getAllDuplicates(file)) {
+			if (f.contextid != file.contextid) {
+				dups.add(f);
+			}
+		}
+
+		return dups;
+	}
 }
 
 // Class to do background loading

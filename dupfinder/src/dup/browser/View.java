@@ -13,7 +13,6 @@ import dup.analyze.DetailLevel;
 import dup.model.Context;
 import dup.model.Database;
 import dup.model.FileInfo;
-import dup.util.Dumper;
 import dup.util.Trace;
 
 public class View {
@@ -26,7 +25,7 @@ public class View {
 	}
 
 	void setDatabaseModel() {
-		Database.instance().setModelAvailable(true);
+		//Database.instance().setModelAvailable(true);
 		// setModel(this.controller.browserTreeModel);
 	}
 
@@ -83,7 +82,7 @@ public class View {
 
 		this.browseTreeSelection = this.widgets.getSelectedBrowseTreeNodes();
 
-		Dumper.dumpSelectionDuplicateInfo(this.browseTreeSelection);
+// TODO		Dumper.dumpSelectionDuplicateInfo(this.browseTreeSelection);
 
 		try {
 			this.dupTreeSelection = null;
@@ -141,12 +140,10 @@ public class View {
 
 	void recycleSelectedFiles(List<FileInfo> files) {
 		recycleSelectedFiles(files, false);
-		;
 	}
 
 	void recycleGDUPSelectedFiles(List<FileInfo> files) {
 		recycleSelectedFiles(files, true);
-		;
 	}
 
 	private void recycleSelectedFiles(List<FileInfo> files, boolean gdupsOnly) {

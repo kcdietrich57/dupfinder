@@ -10,39 +10,32 @@ import java.util.List;
 import dup.analyze.Checksum;
 import dup.analyze.ChecksumValues;
 import dup.analyze.DetailLevel;
-import dup.analyze.DuplicateInfo;
-import dup.analyze.DuplicateInfo2;
 import dup.analyze.Fingerprint;
 
 /** Class representing a file object */
 public class FileInfo extends FileObjectInfo {
-	public static final Collection<FileInfo> NoFiles = Collections.unmodifiableCollection(new ArrayList<FileInfo>());
+	public static final List<FileInfo> NoFiles = Collections.unmodifiableList(new ArrayList<FileInfo>());
 
-	private long filesize;
+	public final long filesize;
 	private long timestamp;
 	public final ChecksumValues checksums;
-	/**
-	 * True if the uniqueness of this file has been confirmed. If the file belongs
-	 * to a list of duplicates, it has been compared fully to other confirmed files
-	 * in the list; if the file is not in such a list, it has been eliminated from
-	 * all lists of same-size files via comparison.<br>
-	 * TODO perhaps this is not any better/different than detailLevel == MAX.
-	 */
-	public boolean confirmed;
 
-	public DuplicateInfo2 dupinfo2;
-	private DuplicateInfo dupinfo;
+	public byte unique;
+	public static final byte UNIQUE = 0;
+	public static final byte GDUP = 1;
+	public static final byte LDUP = 2;
+	public static final byte BDUP = 3;
+	private List<FileInfo> globalDuplicates;
+	private List<FileInfo> contextDuplicates;
 
 	public FileInfo(FolderInfo folder, String name, long size, long modified) {
 		super(folder, name);
 
 		this.filesize = size;
 		this.timestamp = modified;
-		// TODO this should be null if no same-size files exist?
 		this.checksums = new ChecksumValues();
-		this.dupinfo2 = null;
-		this.dupinfo = new DuplicateInfo(this);
-		this.confirmed = false;
+		
+		clearDuplicateInfo();
 	}
 
 	public FileInfo(FolderInfo folder, File file) {
@@ -52,16 +45,11 @@ public class FileInfo extends FileObjectInfo {
 	public FileInfo(FolderInfo folder, FileInfo file) {
 		super(folder, file.getName());
 
-		this.timestamp = file.timestamp;
 		this.filesize = file.filesize;
+		this.timestamp = file.timestamp;
 		this.checksums = file.checksums;
-
-		// TODO bad alias here, copy instead
-		this.dupinfo2 = file.dupinfo2;
-		this.dupinfo = file.dupinfo;
-
-		// TODO uncertain whether a cloned fileinfo should be confirmed or not.
-		this.confirmed = file.confirmed;
+		
+		clearDuplicateInfo();
 	}
 
 	/**
@@ -76,6 +64,14 @@ public class FileInfo extends FileObjectInfo {
 		return isDuplicateOf(other, DetailLevel.Sample);
 	}
 
+	public boolean mayBeDuplicateOf(FileInfo other) {
+		if (this.isIgnoredFile() || other.isIgnoredFile()) {
+			return false;
+		}
+		
+		return this.checksums.mayBeEqual(other.checksums);
+	}
+
 	/**
 	 * Is this file a duplicate of a file in a possibly different context? This will
 	 * optionally compare file contents.
@@ -85,29 +81,7 @@ public class FileInfo extends FileObjectInfo {
 	 * @return True if the files are duplicates by our best information
 	 */
 	public boolean isDuplicateOf(FileInfo other, DetailLevel level) {
-//		if (this.dupinfo.getVerifiedDifferentFiles().contains(other)) {
-//			return false;
-//		}
-//
-//		if ((this.dupinfo.getVerifiedDuplicates() != null) //
-//				&& this.dupinfo.getVerifiedDuplicates().contains(other)) {
-//			return true;
-//		}
-//
-//		if (RegisteredDupDiffInfo.isRegisteredDifferentFile(this, other)) {
-//			this.dupinfo.addToVerifiedDifferent(other.getDupinfo());
-//			return false;
-//		}
-//
-//		if (RegisteredDupDiffInfo.isRegisteredDuplicateFile(this, other)) {
-//			this.dupinfo.addToVerifiedDuplicate(other.getDupinfo());
-//			return true;
-//		}
-
-		if (!checksumsMatch(other, level) //
-		// TODO I believe we have already checked this above
-//				|| !this.dupinfo.isVerifiedEqual(other.getDupinfo())
-		) {
+		if (!checksumsMatch(other, level)) {
 			return false;
 		}
 
@@ -131,9 +105,8 @@ public class FileInfo extends FileObjectInfo {
 			return false;
 		}
 
-		assert (getSize() == other.getSize());
-		if (!level.isGreaterThan(DetailLevel.Size)) {
-			return true;
+		if (getSize() != other.getSize()) {
+			return false;
 		}
 
 		if (!level.isLessThan(DetailLevel.Prefix)) {
@@ -154,11 +127,10 @@ public class FileInfo extends FileObjectInfo {
 		// return true;
 		// }
 
-		return true; // isVerifiedEqual(context, otherContext,
-						// other.getDupinfo());
+		return true;
 	}
 
-	private boolean isIgnoredFile() {
+	public boolean isIgnoredFile() {
 		if (getSize() == 0) {
 			return true;
 		}
@@ -168,37 +140,21 @@ public class FileInfo extends FileObjectInfo {
 		if (getName().startsWith("._")) {
 			return true;
 		}
+		if (getName().charAt(0) == '.' && getName().endsWith(".icloud")) {
+			return true;
+		}
 
 		return false;
 	}
 
-	public void clearDuplicateInfoForRestart() {
-		this.dupinfo.prepareForReanalysis();
+	public void clearDuplicateInfo() {
+		this.unique = FileInfo.UNIQUE;
+		this.globalDuplicates = null;
+		this.contextDuplicates = null;
 	}
 
 	public void dispose() {
-		this.dupinfo.dispose();
-		this.dupinfo = null;
-		this.dupinfo2 = null;
-	}
-
-	/**
-	 * Build duplicate chain for two files (same size) TODO based on current
-	 * information.
-	 * 
-	 * @param other The other file
-	 * @return True if the files are duplicates
-	 */
-	public boolean addFileToDuplicateChain(FileInfo other) {
-		return getDupinfo().addFileToDuplicateChain(other.getDupinfo());
-	}
-
-	public void removeFromDuplicateChains() {
-		getDupinfo().removeFromDuplicateChains();
-		DuplicateInfo2 dupinfo = Database.instance().getDuplicateInfo(this);
-		if (dupinfo != null) {
-			dupinfo.forgetFile(this);
-		}
+		Database.instance().removeFile(this);
 	}
 
 	public long getLastModified() {
@@ -209,8 +165,42 @@ public class FileInfo extends FileObjectInfo {
 		return this.filesize;
 	}
 
-	public DuplicateInfo getDupinfo() {
-		return this.dupinfo;
+	private void cacheDuplicates() {
+		if (this.unique == FileInfo.UNIQUE) {
+			this.contextDuplicates = this.globalDuplicates = NoFiles;
+			return;
+		}
+
+		List<FileInfo> dups = Database.instance().getAllDuplicates(this);
+		assert dups != null;
+
+		for (FileInfo file : dups) {
+			if (file == this) {
+				continue;
+			}
+
+			if (file.contextid == this.contextid) {
+				if (this.contextDuplicates == null) {
+					this.contextDuplicates = new ArrayList<>();
+					this.contextDuplicates.add(this);
+				}
+				this.contextDuplicates.add(file);
+			} else {
+				if (this.globalDuplicates == null) {
+					this.globalDuplicates = new ArrayList<>();
+					this.globalDuplicates.add(this);
+				}
+				this.globalDuplicates.add(file);
+			}
+		}
+		
+		if (this.globalDuplicates == null) {
+			this.globalDuplicates = NoFiles;
+		}
+		
+		if (this.contextDuplicates == null) {
+			this.contextDuplicates = NoFiles;
+		}
 	}
 
 	/**
@@ -218,29 +208,11 @@ public class FileInfo extends FileObjectInfo {
 	 * If there are no duplicates, return empty collection
 	 */
 	public Collection<FileInfo> getContextDuplicates() {
-		List<FileInfo> dups = getAllDuplicates();
-		if (dups == null) {
-			return FileInfo.NoFiles;
+		if (this.contextDuplicates == null) {
+			cacheDuplicates();
 		}
 
-		List<FileInfo> cdups = new ArrayList<FileInfo>();
-
-		for (FileInfo file : dups) {
-			if ((this != file) && (this.contextid == file.contextid)) {
-				cdups.add(file);
-			}
-		}
-
-		if (!cdups.isEmpty()) {
-			cdups.add(this);
-		}
-
-		Collection<FileInfo> cdups2 = getDupinfo().getContextDuplicates();
-		return cdups2;
-	}
-
-	public void setGlobalDuplicates(List<FileInfo> dups) {
-		getDupinfo().setGlobalDuplicates(dups);
+		return this.contextDuplicates;
 	}
 
 	/**
@@ -248,63 +220,55 @@ public class FileInfo extends FileObjectInfo {
 	 * If there are no duplicates, return empty collection
 	 */
 	public Collection<FileInfo> getGlobalDuplicates() {
-		List<FileInfo> dups = getAllDuplicates();
-		if (dups == null) {
-			return FileInfo.NoFiles;
+		if (this.globalDuplicates == null) {
+			cacheDuplicates();
 		}
 
-		List<FileInfo> cdups = new ArrayList<FileInfo>();
-
-		for (FileInfo file : dups) {
-			if (this.contextid != file.contextid) {
-				cdups.add(file);
-			}
-		}
-
-		if (!cdups.isEmpty()) {
-			cdups.add(this);
-		}
-
-		// TODO figure out exactly what this is - return cdups;
-		Collection<FileInfo> cdups2 = getDupinfo().getGlobalDuplicates();
-		return cdups2;
-	}
-
-	private List<FileInfo> getAllDuplicates() {
-		DuplicateInfo2 dupinfo = Database.instance().getDuplicateInfo(this);
-
-		return (dupinfo != null) ? dupinfo.getDuplicates(this) : null;
+		return this.globalDuplicates;
 	}
 
 	public boolean isUnique() {
-		return !(hasContextDuplicates() || hasGlobalDuplicates());
+		return this.unique == FileInfo.UNIQUE;
 	}
 
 	public boolean hasContextDuplicates() {
-		return getDupinfo().hasContextDuplicates();
+		return (this.unique & FileInfo.LDUP) != 0;
 	}
 
 	public boolean hasGlobalDuplicates() {
-		return getDupinfo().hasGlobalDuplicates();
+		return (this.unique & FileInfo.GDUP) != 0;
+	}
+
+	private int safeCount(List<FileInfo> files) {
+		return (files == null) ? 0 : files.size();
 	}
 
 	public int getNumContextDuplicates() {
-		return getDupinfo().getNumContextDuplicates();
+		return safeCount(Database.instance().getContextDuplicates(this));
 	}
 
 	public int getNumGlobalDuplicates() {
-		return getDupinfo().getNumGlobalDuplicates();
+		return safeCount(Database.instance().getGlobalDuplicates(this));
 	}
 
 	public String toString() {
 		String ctxname = (getContext() != null) ? getContext().getName() : "N/A";
-		return String.format("File[%s] cx='%s' sz=%d det=%s %s", //
-				getName(), ctxname, getSize(), //
+		return String.format("File[%s] cx='%s' dup=%d sz=%d det=%s %s", //
+				getName(), ctxname, this.unique, getSize(), //
 				getDetailLevel().toString(), //
 				this.checksums.toString());
 	}
 
+	/** Return if our detail level is at a given level or above */
+	public boolean isDetailLevel(DetailLevel detail) {
+		return this.getDetailLevel().intval >= detail.intval;
+	}
+
 	public DetailLevel getDetailLevel() {
+		if (this.filesize == 0) {
+			return DetailLevel.MAX;
+		}
+
 		DetailLevel level = this.checksums.getDetailLevel();
 
 		if (level == DetailLevel.Size) {
@@ -315,7 +279,9 @@ public class FileInfo extends FileObjectInfo {
 	}
 
 	public void calcChecksums(Context context, DetailLevel detail) {
-		setChecksums(Checksum.getChecksums(this, context, detail));
+		if (context != null) {
+			setChecksums(Checksum.getChecksums(this, context, detail));
+		}
 	}
 
 	public int getPrefixChecksum() {
@@ -374,31 +340,16 @@ public class FileInfo extends FileObjectInfo {
 	}
 
 	public boolean hasDuplicatesInFolder() {
-		return getDupinfo().hasDuplicatesInFolder();
+		if (!hasContextDuplicates()) {
+			return false;
+		}
+
+		for (FileInfo file : Database.instance().getContextDuplicates(this)) {
+			if (this != file && this.getFolder() == file.getFolder()) {
+				return true;
+			}
+		}
+
+		return false;
 	}
-
-	// public boolean matchesFileOnDisk(Context context)
-	// {
-	// File jfile = getJavaFile(context);
-	//
-	// return jfile.exists() //
-	// && jfile.canRead()
-	// && (jfile.length() == this.size)
-	// && (jfile.lastModified() == this.timestamp);
-	// }
-
-	// public boolean simpleCompareTo(FileInfo other)
-	// {
-	// return (this.size == other.size) //
-	// && (this.timestamp == other.timestamp);
-	// }
-
-	// public boolean matches(FileInfo other)
-	// {
-	// return (getSize() == other.getSize()) //
-	// && ((this.dupinfo == null) || this.dupinfo.equals(other.dupinfo));
-	// // && compareSums(this.prefixChecksum, other.prefixChecksum)
-	// // && compareSums(this.sampleChecksum, other.sampleChecksum)
-	// // && compareSums(this.fullChecksum, other.fullChecksum);
-	// }
 }

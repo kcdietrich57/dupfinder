@@ -7,7 +7,6 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 
-import dup.analyze.DetailLevel;
 import dup.model.Context;
 import dup.model.Database;
 import dup.model.FileInfo;
@@ -39,7 +38,7 @@ public class ContextLoader {
 			context = new Context(contextLocation, contextName);
 			context.getRoot();
 
-			context.setDetailLevel(DetailLevel.Sample);
+			//context.setDetailLevel(DetailLevel.Sample);
 
 			if (!v.equals(Persistence.VERSION)) {
 				throw new Exception("Data file version mismatch: " + v + " Expected: " + Persistence.VERSION);
@@ -72,7 +71,7 @@ public class ContextLoader {
 			}
 		}
 
-		context.determineCurrentFileCount();
+		//context.determineCurrentFileCount();
 
 		return context;
 	}
@@ -121,9 +120,9 @@ public class ContextLoader {
 			Database.instance().addFile(finfo);
 			context.addFile(folder, finfo);
 
-			if (finfo.getDetailLevel().isLessThan(context.getDetailLevel())) {
-				context.setDetailLevel(finfo.getDetailLevel());
-			}
+//			if (finfo.getDetailLevel().isLessThan(context.getDetailLevel())) {
+//				context.setDetailLevel(finfo.getDetailLevel());
+//			}
 		}
 
 		return line;

@@ -7,9 +7,9 @@ public class ChecksumValues implements Comparable<ChecksumValues> {
 	public static final int CKSUM_UNDEFINED = 0;
 	public static final int PREFIX_LENGTH = 1024;
 
-	private static boolean sumsAreEqual(int sum1, int sum2) {
-		return compareSums(sum1, sum2) == 0;
-	}
+//	private static boolean sumsAreEqual(int sum1, int sum2) {
+//		return compareSums(sum1, sum2) == 0;
+//	}
 
 	private static int compareSums(int sum1, int sum2) {
 		if (sum1 == CKSUM_UNDEFINED) {
@@ -19,9 +19,15 @@ public class ChecksumValues implements Comparable<ChecksumValues> {
 		return (sum2 == CKSUM_UNDEFINED) ? 1 : (sum1 - sum2);
 	}
 
+	/** Return whether two checksums are known and match */
 	public static boolean isIdentical(int cksum1, int cksum2) {
-		return ((cksum1 != 0) && (cksum2 != 0) //
+		return ((cksum1 != CKSUM_UNDEFINED) && (cksum2 != CKSUM_UNDEFINED) //
 				&& (cksum1 == cksum2));
+	}
+
+	/** Return whether two checksums match to the known level of detail */
+	public static boolean isCompatible(int cksum1, int cksum2) {
+		return (cksum1 == CKSUM_UNDEFINED) || (cksum2 == CKSUM_UNDEFINED) || (cksum1 == cksum2);
 	}
 
 	public static boolean isIdentical(byte[] bytes1, byte[] bytes2) {
@@ -31,10 +37,6 @@ public class ChecksumValues implements Comparable<ChecksumValues> {
 
 		boolean isequal = Arrays.equals(bytes1, bytes2);
 		return isequal;
-	}
-
-	public static boolean checksumsAreCompatible(int cksum1, int cksum2) {
-		return (cksum1 == 0) || (cksum2 == 0) || (cksum1 == cksum2);
 	}
 
 	public static boolean bytesAreCompatible(byte[] bytes1, byte[] bytes2) {
@@ -51,6 +53,7 @@ public class ChecksumValues implements Comparable<ChecksumValues> {
 		this.sampleBytes = null;
 	}
 
+	/** Clone another checksum values object */
 	public void setValues(ChecksumValues source) {
 		this.prefix = source.prefix;
 		this.sample = source.sample;
@@ -73,9 +76,29 @@ public class ChecksumValues implements Comparable<ChecksumValues> {
 	}
 
 	public boolean equals(Object obj) {
-		return (obj instanceof ChecksumValues) //
-				? (compareTo((ChecksumValues) obj) == 0) //
-				: false;
+		return (this == obj) //
+				|| (obj instanceof ChecksumValues) //
+						&& (compareTo((ChecksumValues) obj) == 0);
+	}
+
+	public boolean mayBeEqual(ChecksumValues other) {
+		if (this == other) {
+			return true;
+		}
+
+		// TODO assuming files are the same size
+
+		if (this.prefix != CKSUM_UNDEFINED && other.prefix != CKSUM_UNDEFINED //
+				&& this.prefix != other.prefix) {
+			return false;
+		}
+
+		if (this.sample != CKSUM_UNDEFINED && other.sample != CKSUM_UNDEFINED //
+				&& this.sample != other.sample) {
+			return false;
+		}
+
+		return true;
 	}
 
 	public int compareTo(ChecksumValues other) {
@@ -114,7 +137,7 @@ public class ChecksumValues implements Comparable<ChecksumValues> {
 		return this.prefix ^ this.sample;
 	}
 
-	 public String toString() {
+	public String toString() {
 		return String.format("Cksum: p=%d s=%d sbLen=%d", //
 				this.prefix, this.sample, //
 				((this.sampleBytes != null) ? this.sampleBytes.length : 0));

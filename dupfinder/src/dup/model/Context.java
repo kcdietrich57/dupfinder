@@ -2,12 +2,11 @@ package dup.model;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
-import java.util.Iterator;
 import java.util.List;
 
 import dup.analyze.DetailLevel;
-import dup.analyze.DuplicateChain;
 import dup.util.FileUtil;
 import dup.util.Trace;
 import dup.util.Utility;
@@ -38,64 +37,25 @@ public class Context implements Comparable<Context> {
 	/** Descriptor of the context root */
 	private FolderInfo rootFolder;
 
-	/** How much information has been gathered */
-	private DetailLevel detailLevel;
-
 	/** Java file for the context root */
 	private File rootFolderFile;
-
-	/** Number of files within the context TODO same as allFiles.size()? */
-	private int filecount;
 
 	/** List of files in context, sorted by size */
 	private List<FileInfo> allFiles;
 
-	/** Number of bytes in all files */
-	private long totalsize;
-
-	/** Number of unique files within the context */
-	private int localUniqueCount;
-
-	/** Number of non-unique files within the context */
-	private int dupcount;
-
-	/** The file containing saved context metadata */
-	private File persistenceFile;
-
 	/** Changes exist; context should be saved */
 	private boolean dirty;
-
-	/** Duplicates in this context */
-	private List<DuplicateChain> localDuplicates;
-
-	/** Size of the largest group of identical files */
-	private DuplicateChain maxchain;
-
-	/** Number of bytes wasted by all duplicate files */
-	private long waste;
-
-	/** Duplicate chain containing the most wasted bytes */
-	private DuplicateChain maxwaste;
-
-	public final String mutex = "Context.mutex";
 
 	private Context() {
 		this.id = nextid++;
 
-		this.persistenceFile = null;
 		this.version = null;
 		this.dirty = false;
-		this.detailLevel = DetailLevel.None;
+
 		this.rootFolderFile = null;
 		this.rootFolder = null;
 
-		this.allFiles = new ArrayList<FileInfo>();
-		this.localDuplicates = new ArrayList<DuplicateChain>();
-
-		this.dupcount = 0;
-		this.maxchain = null;
-		this.waste = 0L;
-		this.maxwaste = null;
+		this.allFiles = null; // new ArrayList<FileInfo>();
 	}
 
 	/** Construct a context from filesystem or saved data */
@@ -107,9 +67,6 @@ public class Context implements Comparable<Context> {
 		System.out.println("Folder file " + this.rootFolderFile.getAbsolutePath());
 		this.name = name;
 		this.dirty = false;
-
-		this.filecount = 0;
-		this.localUniqueCount = 0;
 	}
 
 	/** Create a dummy clone context */
@@ -119,7 +76,7 @@ public class Context implements Comparable<Context> {
 		this.name = other.name;
 		this.version = other.version;
 		this.dirty = false;
-		this.detailLevel = other.detailLevel;
+		// this.detailLevel = other.detailLevel;
 		this.rootFolderFile = other.rootFolderFile;
 		this.rootFolder = new FolderInfo(this, this.rootFolderFile);
 	}
@@ -130,8 +87,6 @@ public class Context implements Comparable<Context> {
 
 	/** Close a context and remove its files from the Database */
 	public void close() {
-		restartAnalysis();
-
 		for (FileInfo f : this.allFiles.toArray(new FileInfo[0])) {
 			f.dispose();
 		}
@@ -140,73 +95,34 @@ public class Context implements Comparable<Context> {
 		this.rootFolder = null;
 	}
 
-	/** Rebuild duplicate information from scratch using current Contexts */
-	private void restartAnalysis() {
-		this.filecount = 0;
-		this.localUniqueCount = 0;
-		this.dupcount = 0;
-
-		this.localDuplicates.clear();
-
-		clearDupCount(this.rootFolder);
-		clearDupFileInfo();
-	}
-
-	/** Reset duplicate counters for a subtree */
-	private void clearDupCount(FolderInfo folder) {
-		folder.folderDupCount = 0;
-
-		for (FolderInfo subfolder : folder.getSubfolders()) {
-			clearDupCount(subfolder);
-		}
-	}
-
-	/** Reset duplicate info for all files in this context */
-	private void clearDupFileInfo() {
-		Iterator<FileInfo> iter = this.rootFolder.iterateFiles(true);
-		while (iter.hasNext()) {
-			FileInfo file = iter.next();
-
-			file.clearDuplicateInfoForRestart();
-		}
-	}
-
-	/**
-	 * Get the number of files in the context, optionally resetting the cached value
-	 */
-	public int getFileCount(boolean determine) {
-		if (determine) {
-			this.filecount = 0;
-
-			determineCurrentFileCount();
+	/** Get the number of files in the context */
+	public int getFileCount() {
+		if (this.allFiles == null) {
+			this.allFiles = new ArrayList<FileInfo>();
+			return -1;
 		}
 
-		return this.filecount;
+		return this.allFiles.size();
 	}
 
-	/** Determine the number of files in this context if not already known */
-	public void determineCurrentFileCount() {
-		if ((this.filecount <= 0) && (this.rootFolder != null)) {
-			this.filecount = this.rootFolder.getTreeFileCount();
+	public long getTotalSize() {
+		long size = 0;
+
+		for (FileInfo f : this.allFiles) {
+			size += f.filesize;
 		}
+
+		return size;
 	}
 
-	/** Determine the minimum detail level for files in this context */
-	public DetailLevel determineDetailLevel() {
-		DetailLevel detail = DetailLevel.Sample;
+	public long getWaste() {
+		long waste = 0;
 
-		if (this.rootFolder != null) {
-			Iterator<FileInfo> iter = this.rootFolder.iterateFiles(true);
-			while (iter.hasNext()) {
-				FileInfo file = iter.next();
-
-				if (file.getDetailLevel().isLessThan(detail)) {
-					detail = file.getDetailLevel();
-				}
-			}
+		for (List<FileInfo> grp : Database.instance().getGroups(this)) {
+			waste += getWaste(grp);
 		}
 
-		return detail;
+		return waste;
 	}
 
 	/** Locate the root folder for this context */
@@ -217,7 +133,7 @@ public class Context implements Comparable<Context> {
 			String rootfolder = this.rootFolder.toString();
 			String rootfoldername = this.rootFolder.getFullName();
 			System.out.println("Created root folder for '" + rootpath + "'" //
-					 + ": " + rootfolder + " " + rootfoldername);
+					+ ": " + rootfolder + " " + rootfoldername);
 		}
 
 		return this.rootFolder;
@@ -227,10 +143,10 @@ public class Context implements Comparable<Context> {
 	public void removeFile(FileInfo file) {
 		FolderInfo folder = file.getFolder();
 
-		file.removeFromDuplicateChains();
 		folder.removeFile(file);
 		this.allFiles.remove(file);
-		--this.filecount;
+
+		Database.instance().removeFile(file);
 
 		setDirty();
 	}
@@ -294,108 +210,13 @@ public class Context implements Comparable<Context> {
 
 	/** Build the context from the filesystem */
 	public int ingest() {
-		if (this.detailLevel.isLessThan(DetailLevel.Size)) {
+		if (this.allFiles == null) { // this.detailLevel.isLessThan(DetailLevel.Size)) {
+			this.allFiles = new ArrayList<>();
+
 			return FileUtil.ingestContext(this, DetailLevel.Size);
 		}
 
 		return getRoot().getTreeFileCount();
-	}
-
-	/** Build a chain containing same-size files in this context */
-	public DuplicateChain getSameSizeFileChain(FileInfo file) {
-		if (this.allFiles.isEmpty()) {
-			return null;
-		}
-
-		int start = 0;
-		int end = this.allFiles.size();
-		int probe = -1;
-
-		for (;;) {
-			int mid = (end + start) / 2;
-
-			if (mid == probe) {
-				++probe;
-			} else {
-				probe = mid;
-			}
-
-			if (probe >= end) {
-				return null;
-			}
-
-			FileInfo probefile = this.allFiles.get(probe);
-
-			long diff = probefile.getSize() - file.getSize();
-			if (diff == 0) {
-				break;
-			}
-
-			if (diff < 0) {
-				start = probe + 1;
-			} else {
-				end = probe;
-			}
-		}
-
-		for (; probe > 0; --probe) {
-			FileInfo probefile = this.allFiles.get(probe - 1);
-
-			if (probefile.getSize() != file.getSize()) {
-				break;
-			}
-		}
-
-		DuplicateChain chain = new DuplicateChain(this.allFiles.get(probe));
-
-		for (; probe < this.allFiles.size(); ++probe) {
-			FileInfo probefile = this.allFiles.get(probe);
-
-			if (probefile.getSize() != file.getSize()) {
-				break;
-			}
-
-			chain.addFile(probefile);
-		}
-
-		return chain;
-	}
-
-	/** Process files in this context for duplicates */
-	public void analyzeContextDuplicates() {
-		int level = Trace.NORMAL;
-
-		restartAnalysis();
-
-		this.filecount = this.rootFolder.getTreeFileCount();
-		this.totalsize = getRoot().getTreeSize();
-
-		Trace.traceln(level);
-		Trace.traceln(level, "Analyzing duplicates for context " + getName());
-		Trace.traceln(level, " Total files:  " + this.filecount //
-				+ " size=" + Utility.formatSize(this.totalsize));
-
-		Trace.traceln(level);
-		Trace.traceln(level, "Analyzing file sizes...");
-		analyzeFileSize();
-
-		dumpDuplicateChains(level, "Based on file size");
-
-		Trace.traceln(level);
-		Trace.traceln(level, "Checking for context duplicates...");
-		gatherDuplicateFiles();
-
-		Trace.traceln(level);
-		Trace.traceln(level, "Rebuilding context duplicates...");
-		rebuildContextDuplicates();
-
-		dumpDuplicateChains(Trace.NORMAL, "Based on cksum/comparison");
-
-		for (FileInfo file : this.allFiles) {
-			if (!file.isUnique()) {
-				++file.getFolder().folderDupCount;
-			}
-		}
 	}
 
 	public void addFile(FolderInfo folder, FileInfo file) {
@@ -403,166 +224,51 @@ public class Context implements Comparable<Context> {
 		FileUtil.addFile(this.allFiles, file);
 	}
 
-	/** Put context files with the same size into DuplicateChains */
-	private void analyzeFileSize() {
-//		Iterator<FileInfo> iter = this.rootFolder.iterateFiles(true);
-//		while (iter.hasNext()) {
-//			FileInfo file = iter.next();
-//
-//			addFile(file);
-//		}
-//
-//		Collections.sort(this.allFiles, compareFileSize);
-
-		for (int ii = 0; ii < this.filecount;) {
-			FileInfo file = this.allFiles.get(ii);
-
-			int lastidx = ii + 1;
-
-			while ((lastidx < this.filecount) //
-					&& (this.allFiles.get(lastidx).getSize() == file.getSize())) {
-				++lastidx;
-			}
-
-			int sscount = lastidx - ii;
-
-			if (sscount == 1) {
-				++this.localUniqueCount;
-			} else {
-				DuplicateChain newchain = new DuplicateChain();
-
-				for (int di = ii; di < lastidx; ++di) {
-					newchain.addFile(this.allFiles.get(di));
-				}
-
-				this.localDuplicates.add(newchain);
-			}
-
-			ii = lastidx;
-		}
-	}
-
-	/**
-	 * For each DuplicateChain containing files with the same size in this context,
-	 * analyze the files further. Link duplicate files together so each item in the
-	 * chain will be a set of linked identical files.
-	 */
-	private void gatherDuplicateFiles() {
-		countDuplicates();
-
-		long msDeadline = System.currentTimeMillis() + 2000;
-		int numFilesToProcess = this.dupcount;
-		int numFilesRemaining = this.dupcount;
-		int numchains = this.localDuplicates.size();
-
-		for (int idx = 0; idx < this.localDuplicates.size(); ++idx) {
-			DuplicateChain chain = this.localDuplicates.get(idx);
-
-			if (System.currentTimeMillis() >= msDeadline) {
-				Trace.traceln(Trace.NORMAL, //
-						"Processing chain " + idx + "/" + numchains //
-								+ " (" + chain.getNumFiles() + ")" //
-								+ " " + numFilesRemaining //
-								+ " of " + numFilesToProcess + " files remaining");
-				msDeadline += 2000;
-			}
-
-			for (int ii = 0; ii < chain.getNumFiles(); ++ii) {
-				FileInfo f1 = chain.getFileInfo(ii);
-				--numFilesRemaining;
-
-				for (int jj = ii + 1; jj < chain.getNumFiles();) {
-					FileInfo f2 = chain.getFileInfo(jj);
-
-					if (f1.addFileToDuplicateChain(f2)) {
-						chain.removeFile(jj);
-						--numFilesRemaining;
-					} else {
-						++jj;
-					}
-				}
-			}
-		}
-	}
-
-	/** Build duplicate chains for this context */
-	private void rebuildContextDuplicates() {
-		List<DuplicateChain> verifiedDuplicateChains = new ArrayList<DuplicateChain>();
-
-		for (DuplicateChain chain : this.localDuplicates) {
-			for (int ii = 0; ii < chain.getNumFiles(); ++ii) {
-				FileInfo f1 = chain.getFileInfo(ii);
-
-				if (!f1.hasContextDuplicates()) {
-					chain.removeFile(ii);
-					++this.localUniqueCount;
-					continue;
-				}
-
-				DuplicateChain newchain = new DuplicateChain();
-				verifiedDuplicateChains.add(newchain);
-
-				for (FileInfo dupf : f1.getContextDuplicates()) {
-					newchain.addFile(dupf);
-				}
-			}
-		}
-
-		this.localDuplicates.clear();
-		this.localDuplicates.addAll(verifiedDuplicateChains);
-	}
-
 	/** Output description of duplicate chains for this context */
 	private void dumpDuplicateChains(int level, String title) {
-		countDuplicates();
+		// countDuplicates();
 
 		Trace.traceln(level, title);
 
-		Trace.traceln(level, " Unique: " + this.localUniqueCount);
+		Trace.traceln(level, " Unique: " + getUniqueFileCount()); // this.localUniqueCount);
 
-		Trace.trace(level, " Dups: " + this.dupcount);
-		Trace.trace(level, " in " + this.localDuplicates.size() + " groups");
+		Trace.trace(level, " Dups: " + getDupFileCount()); // this.dupcount);
+		Database db = Database.instance();
+		List<List<FileInfo>> groups = db.getGroups(this);
+		Trace.trace(level, String.format(" in %d groups", groups.size()));
 
-		if (this.maxchain != null) {
-			Trace.trace(level, ", Largest: files=" + this.maxchain.getNumFiles());
-			Trace.trace(level, " waste= " + Utility.formatSize(this.maxchain.getWaste()));
+		List<FileInfo> longestGroup = null;
+		List<FileInfo> largestGroup = null;
+
+		for (List<FileInfo> group : groups) {
+			if (group.size() > longestGroup.size()) {
+				longestGroup = group;
+			}
+
+			if (getWaste(group) > getWaste(largestGroup)) {
+				largestGroup = group;
+			}
 		}
+
+		Trace.trace(level, ", Longest: files=" + longestGroup.size());
+		Trace.trace(level, " waste= " + Utility.formatSize(getWaste(largestGroup)));
 
 		Trace.traceln(level);
 
-		float wasteRatio = ((float) this.waste) / this.totalsize;
-		Trace.trace(level, " Waste " + Utility.formatSize(this.waste) //
+		long totalWaste = getWaste();
+
+		float wasteRatio = ((float) totalWaste) / getTotalSize();
+		Trace.trace(level, " Waste " + Utility.formatSize(totalWaste) //
 				+ "(" + Utility.formatPercent(wasteRatio) + "%)");
 
-		if (this.maxwaste != null) {
-			Trace.trace(level, ", Largest: files=" + this.maxwaste.getNumFiles());
-			Trace.trace(level, " waste=: " + Utility.formatSize(this.maxwaste.getWaste()));
-		}
+		Trace.trace(level, ", Largest: files=" + largestGroup.size());
+		Trace.trace(level, " waste=: " + Utility.formatSize(getWaste(largestGroup)));
 
 		Trace.traceln(level);
 	}
 
-	/** Gather statistics for duplicates in this context */
-	private void countDuplicates() {
-		this.dupcount = 0;
-		this.maxchain = null;
-		this.waste = 0L;
-		this.maxwaste = null;
-
-		for (DuplicateChain chain : this.localDuplicates) {
-			this.dupcount += chain.getNumFiles();
-			this.waste += chain.getWaste();
-
-			if ((this.maxchain == null) //
-					|| (chain.getNumFiles() > this.maxchain.getNumFiles())) {
-				this.maxchain = chain;
-			}
-
-			if ((this.maxwaste == null) //
-					|| (chain.getWaste() > this.maxwaste.getWaste())) {
-				this.maxwaste = chain;
-			}
-		}
+	private long getWaste(List<FileInfo> group) {
+		return (group.size() - 1) * group.get(0).filesize;
 	}
 
 	public String getVersion() {
@@ -574,19 +280,28 @@ public class Context implements Comparable<Context> {
 	}
 
 	public List<FileInfo> getAllFiles() {
-		return this.allFiles;
+		return Collections.unmodifiableList(this.allFiles);
 	}
 
 	public int getUniqueFileCount() {
-		return this.localUniqueCount;
+		return this.rootFolder.getTreeUniqueCount();
+		// return this.localUniqueCount;
+	}
+
+	public int getDupFileCount() {
+		return this.rootFolder.getTreeDupCount();
 	}
 
 	public DetailLevel getDetailLevel() {
-		return this.detailLevel;
-	}
+		DetailLevel detailLevel = DetailLevel.MAX;
 
-	public void setDetailLevel(DetailLevel detail) {
-		this.detailLevel = detail;
+		for (FileInfo f : this.allFiles) {
+			if (f.getDetailLevel().intval < detailLevel.intval) {
+				detailLevel = f.getDetailLevel();
+			}
+		}
+
+		return detailLevel;
 	}
 
 	public String getName() {
