@@ -202,6 +202,15 @@ public class View {
 		this.widgets.restoreExpandedState();
 	}
 
+	void toggleShowSmallFiles() {
+		boolean yesno = this.widgets.showSmallFilesButton.isSelected();
+
+		// TODO foo();
+		this.widgets.saveExpandedState();
+		this.controller.browserTreeModel.filter.showSmallFiles(yesno);
+		this.widgets.restoreExpandedState();
+	}
+
 	void toggleShowLocalDups() {
 		boolean yesno = this.widgets.showLocalDupsButton.isSelected();
 

@@ -26,6 +26,7 @@ class Actions {
 		this.recycleAction = new RecycleAction();
 		this.recycleGDUPAction = new RecycleGDUPAction();
 		this.showFilesAction = new ShowFilesAction();
+		this.showSmallFilesAction = new ShowSmallFilesAction();
 		this.showEmptyFoldersAction = new ShowEmptyFoldersAction();
 		this.showUniqueAction = new ShowUniqueAction();
 		this.showLocalDupsAction = new ShowLocalDupsAction();
@@ -48,6 +49,10 @@ class Actions {
 
 	private void toggleShowFiles() {
 		this.view.toggleShowFiles();
+	}
+
+	private void toggleShowSmallFiles() {
+		this.view.toggleShowSmallFiles();
 	}
 
 	private void toggleShowUnique() {
@@ -165,6 +170,16 @@ class Actions {
 
 		public void actionPerformed(ActionEvent e) {
 			toggleShowFiles();
+		}
+	}
+
+	class ShowSmallFilesAction extends AbstractAction {
+		public ShowSmallFilesAction() {
+			super("SmallFiles", UIUtility.getIcon("imgFile", "Files"));
+		}
+
+		public void actionPerformed(ActionEvent e) {
+			toggleShowSmallFiles();
 		}
 	}
 
@@ -359,4 +374,5 @@ class Actions {
 	Action showLocalDupsAction;
 	Action showGlobalDupsAction;
 	Action showFilesAction;
+	Action showSmallFilesAction;
 }

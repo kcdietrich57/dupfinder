@@ -731,6 +731,11 @@ public class Database {
 			List<FileInfo> group = workingGroups.get(grpnum);
 
 			long[] work = getWorkingSize(group);
+			if (group.size() > 150) {
+				System.out.println("Group ct=" + group.size() + " sz=" + group.get(0).filesize);
+				System.out.println("xyzzy");
+			}
+
 			System.out.println(String.format( //
 					"Group %d/%d [%s] Working files: %d/%d size %d\n  Total remaining files: %d [%s]", //
 					grpnum + 1, workingGroups.size(), //
@@ -787,7 +792,12 @@ public class Database {
 			return false;
 		}
 
-		file.calcChecksums(file.getContext(), file.getDetailLevel().nextLevel());
+		DetailLevel cur = file.getDetailLevel();
+		DetailLevel next = cur.nextLevel();
+//		System.out.println(String.format( //
+//				"Improving detail (%s-%s) for '%s'", //
+//				cur.name, next.name, file.getFullName()));
+		file.calcChecksums(file.getContext(), next);
 
 		return true;
 	}
@@ -858,6 +868,7 @@ public class Database {
 	private void partitionGroup(List<FileInfo> group) {
 		if (hasPotentialDuplicates(group)) {
 			System.out.println("ERROR: Normalize before partitioning!");
+			hasPotentialDuplicates(group);
 			System.exit(1);
 		}
 

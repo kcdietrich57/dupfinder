@@ -113,8 +113,10 @@ public class FoldersTreeCellRenderer extends DefaultTreeCellRenderer {
 			return "[S]";
 		case Size:
 			return "[Z]";
+		case Full:
+			return "[F]";
 		default:
-			return "???";
+			return "[?]";
 		}
 	}
 }

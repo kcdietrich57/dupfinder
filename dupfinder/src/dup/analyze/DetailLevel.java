@@ -4,9 +4,10 @@ public enum DetailLevel {
 	None(0, "None"), //
 	Size(1, "Size"), //
 	Prefix(2, "Prefix"), //
-	Sample(3, "Sample");
+	Sample(3, "Sample"),
+	Full(4, "Full");
 
-	public static final DetailLevel MAX = Sample;
+	public static final DetailLevel MAX = Full;
 
 	public int intval;
 	public String name;
@@ -35,8 +36,10 @@ public enum DetailLevel {
 		case 1:
 			return Prefix;
 		case 2:
-		default:
 			return Sample;
+		case 3:
+		default:
+			return Full;
 		}
 	}
 

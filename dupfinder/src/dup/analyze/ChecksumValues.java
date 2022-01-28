@@ -46,10 +46,11 @@ public class ChecksumValues implements Comparable<ChecksumValues> {
 
 	public int prefix;
 	public int sample;
+	public int full;
 	public byte[] sampleBytes;
 
 	public ChecksumValues() {
-		this.prefix = this.sample = CKSUM_UNDEFINED;
+		this.prefix = this.sample = this.full = CKSUM_UNDEFINED;
 		this.sampleBytes = null;
 	}
 
@@ -57,6 +58,7 @@ public class ChecksumValues implements Comparable<ChecksumValues> {
 	public void setValues(ChecksumValues source) {
 		this.prefix = source.prefix;
 		this.sample = source.sample;
+		this.full = source.full;
 
 		this.sampleBytes = (source.sampleBytes != null) //
 				? Arrays.copyOf(source.sampleBytes, source.sampleBytes.length) //
@@ -64,6 +66,10 @@ public class ChecksumValues implements Comparable<ChecksumValues> {
 	}
 
 	public DetailLevel getDetailLevel() {
+		if (this.full != CKSUM_UNDEFINED) {
+			return DetailLevel.Full;
+		}
+
 		if (this.sample != CKSUM_UNDEFINED) {
 			return DetailLevel.Sample;
 		}
@@ -88,6 +94,11 @@ public class ChecksumValues implements Comparable<ChecksumValues> {
 
 		// TODO assuming files are the same size
 
+		if (this.full != CKSUM_UNDEFINED && other.full != CKSUM_UNDEFINED //
+				&& this.full != other.full) {
+			return false;
+		}
+
 		if (this.prefix != CKSUM_UNDEFINED && other.prefix != CKSUM_UNDEFINED //
 				&& this.prefix != other.prefix) {
 			return false;
@@ -108,6 +119,11 @@ public class ChecksumValues implements Comparable<ChecksumValues> {
 		}
 
 		diff = compareSums(this.sample, other.sample);
+		if (diff != 0) {
+			return diff;
+		}
+
+		diff = compareSums(this.full, other.full);
 		if (diff != 0) {
 			return diff;
 		}
@@ -134,12 +150,12 @@ public class ChecksumValues implements Comparable<ChecksumValues> {
 	}
 
 	public int hashCode() {
-		return this.prefix ^ this.sample;
+		return this.prefix ^ this.sample ^ this.full;
 	}
 
 	public String toString() {
-		return String.format("Cksum: p=%d s=%d sbLen=%d", //
-				this.prefix, this.sample, //
+		return String.format("Cksum: p=%d s=%d f=%d sbLen=%d", //
+				this.prefix, this.sample, this.full, //
 				((this.sampleBytes != null) ? this.sampleBytes.length : 0));
 	}
 }

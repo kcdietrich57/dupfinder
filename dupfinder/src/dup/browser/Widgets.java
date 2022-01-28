@@ -115,6 +115,7 @@ class Widgets {
 		items.add(this.actions.new LoadDetailAction(selobjs, DetailLevel.Size, minDetail));
 		items.add(this.actions.new LoadDetailAction(selobjs, DetailLevel.Prefix, minDetail));
 		items.add(this.actions.new LoadDetailAction(selobjs, DetailLevel.Sample, minDetail));
+		items.add(this.actions.new LoadDetailAction(selobjs, DetailLevel.Full, minDetail));
 
 		if (!items.isEmpty()) {
 			for (Action item : items) {
@@ -253,6 +254,11 @@ class Widgets {
 		this.showFilesButton.setHideActionText(true);
 		this.showFilesButton.setToolTipText("Show files in browse tree");
 
+		this.showSmallFilesButton = new JToggleButton( //
+				this.actions.showSmallFilesAction);
+		this.showSmallFilesButton.setHideActionText(true);
+		this.showSmallFilesButton.setToolTipText("Show small files in browse tree");
+
 		this.showEmptyFoldersButton = new JToggleButton( //
 				this.actions.showEmptyFoldersAction);
 		this.showEmptyFoldersButton.setHideActionText(true);
@@ -289,6 +295,7 @@ class Widgets {
 		this.toolBar.addSeparator();
 
 		this.toolBar.add(this.showFilesButton);
+		this.toolBar.add(this.showSmallFilesButton);
 		this.toolBar.add(this.showEmptyFoldersButton);
 
 		this.toolBar.addSeparator();
@@ -354,10 +361,15 @@ class Widgets {
 
 	public void updateUIState() {
 		FolderTreeModel model = this.view.getBrowserTreeModel();
+		FolderTreeModel dmodel = (FolderTreeModel)this.duplicateTree.getModel();
+		
 		Object[] selobjs = this.view.getBrowserTreeSelection();
 		TreeModelFilter filter = model.getModelFilter();
+		dmodel.filter.flags = filter.flags;
+		dmodel.filter.showEmptyFolders(false);
 
 		this.showFilesButton.setSelected(filter.showFiles());
+		this.showSmallFilesButton.setSelected(filter.showSmallFiles());
 		this.showEmptyFoldersButton.setSelected(filter.showEmptyFolders());
 		this.showUniqueButton.setSelected(filter.showUniqueFiles());
 		this.showLocalDupsButton.setSelected(filter.showLocalDuplicateFiles());
@@ -485,6 +497,7 @@ class Widgets {
 	JToggleButton showUniqueButton;
 	JToggleButton showLocalDupsButton;
 	JToggleButton showGlobalDupsButton;
+	JToggleButton showSmallFilesButton;
 	JToggleButton showFilesButton;
 
 	JButton recycleButton;

@@ -28,14 +28,15 @@ class TreeModelFilter {
 	}
 
 	public static final int SHOW_FILES = 0x01;
-	public static final int SHOW_UNIQUE = 0x02;
-	public static final int SHOW_LDUPS = 0x04;
-	public static final int SHOW_GDUPS = 0x08;
-	public static final int SHOW_LGDUPS = 0x10;
-	public static final int SHOW_EMPTY_FOLDERS = 0x20;
+	public static final int SHOW_SMALL_FILES = 0x02;
+	public static final int SHOW_UNIQUE = 0x04;
+	public static final int SHOW_LDUPS = 0x08;
+	public static final int SHOW_GDUPS = 0x10;
+	public static final int SHOW_LGDUPS = 0x20;
+	public static final int SHOW_EMPTY_FOLDERS = 0x40;
 
-	public static final int SHOW_ALL_FILES = 0x17;
-	public static final int SHOW_ALL = 0x37;
+	public static final int SHOW_ALL_FILES = 0x37;
+	public static final int SHOW_ALL = 0x57;
 
 	public int flags = SHOW_FILES | SHOW_LDUPS | SHOW_GDUPS | SHOW_LGDUPS;
 
@@ -55,6 +56,10 @@ class TreeModelFilter {
 
 	public boolean showFiles() {
 		return ((this.flags & SHOW_FILES) != 0);
+	}
+
+	public boolean showSmallFiles() {
+		return ((this.flags & SHOW_SMALL_FILES) != 0);
 	}
 
 	public boolean showUniqueFiles() {
@@ -79,6 +84,10 @@ class TreeModelFilter {
 
 	public void showFiles(boolean yesno) {
 		showItems(TreeModelFilter.SHOW_FILES, yesno);
+	}
+
+	public void showSmallFiles(boolean yesno) {
+		showItems(TreeModelFilter.SHOW_SMALL_FILES, yesno);
 	}
 
 	public void showUniqueFiles(boolean yesno) {
@@ -125,7 +134,9 @@ class TreeModelFilter {
 			b = true;
 		}
 
-		return b && isReachableFromSelection(file);
+		boolean sizeVisible = showSmallFiles() || (file.filesize > 10 * 1024 * 1024);
+
+		return b && sizeVisible && isReachableFromSelection(file);
 	}
 
 	private boolean isReachableFromSelection(FileInfo file) {

@@ -14,10 +14,11 @@ import dup.util.Trace;
 public abstract class Checksum {
 	public static final int BUFFER_SIZE = 1024;
 	public static final int prefixCount = 1;
+	public static final long LARGE_FILE = 50 * 1024 * 1024;
 
 	/** Percentage of file data to include in checksum calculations */
 	private static double samplePercent() {
-		return 2.0;
+		return 4.0;
 	}
 
 	/** Holds information about checksums during the process of calculation */
@@ -26,13 +27,17 @@ public abstract class Checksum {
 
 		public final MessageDigest msgdigestPrefix;
 		public final MessageDigest msgdigestSample;
+		public final MessageDigest msgdigestFull;
 
 		public Checksums_internal(DetailLevel detail) {
 			MessageDigest px = null;
 			MessageDigest sx = null;
+			MessageDigest fu = null;
 
 			try {
 				switch (detail) {
+				case Full:
+					fu = MessageDigest.getInstance("MD5");
 				case Sample:
 					sx = MessageDigest.getInstance("MD5");
 				case Prefix:
@@ -48,10 +53,15 @@ public abstract class Checksum {
 
 			this.msgdigestPrefix = px;
 			this.msgdigestSample = sx;
+			this.msgdigestFull = fu;
 		}
 
 		/** Create the checksum values from the stored digest information */
 		public void processData() {
+			if (this.msgdigestFull != null) {
+				this.checksums.full = getChecksum(this.msgdigestFull);
+			}
+
 			if (this.msgdigestSample != null) {
 				this.checksums.sample = getChecksum(this.msgdigestSample);
 			}
@@ -89,8 +99,12 @@ public abstract class Checksum {
 		}
 
 		if ((file.length() <= BUFFER_SIZE) //
-				&& detail.isLessThan(DetailLevel.Sample)) {
-			cksums.checksums.sample = cksums.checksums.prefix;
+				&& detail.isLessThan(DetailLevel.Full)) {
+			cksums.checksums.full = cksums.checksums.sample = cksums.checksums.prefix;
+		} else if ((file.length() > LARGE_FILE) //
+				&& !detail.isLessThan(DetailLevel.Sample) //
+				&& detail.isLessThan(DetailLevel.Full)) {
+			cksums.checksums.full = cksums.checksums.sample;
 		}
 
 		return cksums.checksums;
@@ -104,19 +118,19 @@ public abstract class Checksum {
 		try {
 			byte[] buffer = new byte[BUFFER_SIZE];
 
+			// System.out.println("Opening file " + file.getName());
 			raf = new RandomAccessFile(file, "r");
 
-			for (int ii = 0;; ++ii) {
-				if (cksums.msgdigestSample != null) {
-					if ((ii > prefixCount) && (0 != (ii % sampleFreq))) {
-						continue;
-					}
-
-					raf.seek(BUFFER_SIZE * (long) ii);
+			for (int ii = 0;;) {
+				if ((cksums.msgdigestSample == null) && (cksums.msgdigestFull == null) //
+						&& (ii >= prefixCount)) {
+					break;
 				}
 
-				if ((cksums.msgdigestSample == null) && (ii >= prefixCount)) {
-					break;
+				if ((ii > prefixCount) && (cksums.msgdigestFull == null)) {
+					long off = BUFFER_SIZE * (long) ii;
+					// System.out.println("Seeking " + off);
+					raf.seek(off);
 				}
 
 				int numRead = raf.read(buffer);
@@ -125,6 +139,7 @@ public abstract class Checksum {
 				}
 
 				if ((ii == 0) && (cksums.checksums.sampleBytes == null)) {
+					// TODO magic number (sample buffer length == 128)
 					int length = Math.min(numRead, 128);
 					cksums.checksums.sampleBytes = Arrays.copyOf(buffer, length);
 				}
@@ -135,6 +150,17 @@ public abstract class Checksum {
 
 				if ((cksums.msgdigestSample != null) && ((ii % sampleFreq) == 0)) {
 					cksums.msgdigestSample.update(buffer, 0, numRead);
+				}
+
+				if (cksums.msgdigestFull != null) {
+					cksums.msgdigestFull.update(buffer, 0, numRead);
+				}
+
+				if (cksums.msgdigestFull == null && ii >= prefixCount //
+						&& cksums.msgdigestSample != null) {
+					ii += sampleFreq - (ii % sampleFreq);
+				} else {
+					++ii;
 				}
 			}
 
